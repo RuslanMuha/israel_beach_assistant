@@ -5,5 +5,4 @@ target/
 .classpath
 .project
 .settings/
-.cursor/hooks.log
-.cursor/session-summary.txt
+.cursor/
