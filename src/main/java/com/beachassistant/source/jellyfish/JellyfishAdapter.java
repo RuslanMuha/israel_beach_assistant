@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -58,7 +59,15 @@ public class JellyfishAdapter implements SourceAdapter<JellyfishRecord> {
             if (beach.getLatitude() == null || beach.getLongitude() == null) {
                 return FetchResult.failure(sourceType(), "Beach has no coordinates: " + request.getBeachSlug());
             }
-            JsonNode root = inaturalistClient.fetchObservations(beach.getLatitude(), beach.getLongitude());
+            var rootPr = inaturalistClient.fetchObservations(beach.getLatitude(), beach.getLongitude());
+            JsonNode root = rootPr.json();
+            List<String> httpWarnings = new ArrayList<>();
+            if (rootPr.staleFallback()) {
+                httpWarnings.add("STALE_HTTP_FALLBACK");
+            }
+            if (rootPr.shortCircuit()) {
+                httpWarnings.add("HTTP_RESPONSE_SHORT_CIRCUIT");
+            }
             int total = root.path("total_results").asInt(0);
             JsonNode results = root.path("results");
             LocalDate cutoff = LocalDate.now(ISRAEL).minusDays(14);
@@ -89,9 +98,9 @@ public class JellyfishAdapter implements SourceAdapter<JellyfishRecord> {
                     .confidenceLevel(confidence)
                     .rawPayloadJson(raw)
                     .build();
-            return FetchResult.success(sourceType(), List.of(record));
+            return FetchResult.success(sourceType(), List.of(record), httpWarnings);
         } catch (Exception e) {
-            log.error("Jellyfish fetch failed for beach={}", request.getBeachSlug(), e);
+            log.warn("Jellyfish fetch failed for beach={}: {}", request.getBeachSlug(), e.getMessage());
             return FetchResult.failure(sourceType(), e.getMessage());
         }
     }

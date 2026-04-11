@@ -21,11 +21,15 @@ public class FetchResult<T> {
     private final String rawResponseMeta;
 
     public static <T> FetchResult<T> success(SourceType sourceType, List<T> records) {
+        return success(sourceType, records, Collections.emptyList());
+    }
+
+    public static <T> FetchResult<T> success(SourceType sourceType, List<T> records, List<String> warnings) {
         return FetchResult.<T>builder()
                 .sourceType(sourceType)
                 .fetchedAt(ZonedDateTime.now())
                 .records(records)
-                .warnings(Collections.emptyList())
+                .warnings(warnings != null ? warnings : Collections.emptyList())
                 .success(true)
                 .build();
     }

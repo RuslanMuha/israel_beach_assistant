@@ -1,15 +1,15 @@
 package com.beachassistant.source.inaturalist;
 
 import com.beachassistant.config.BeachProvidersProperties;
+import com.beachassistant.integration.IntegrationSourceKey;
+import com.beachassistant.integration.http.OutboundHttpService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
-import java.time.Duration;
 import java.util.stream.Collectors;
 
 /**
@@ -19,19 +19,19 @@ import java.util.stream.Collectors;
 @Component
 public class InaturalistClient {
 
-    private final WebClient webClient;
+    private final OutboundHttpService outboundHttpService;
     private final BeachProvidersProperties props;
     private final ObjectMapper objectMapper;
 
-    public InaturalistClient(WebClient.Builder webClientBuilder,
+    public InaturalistClient(OutboundHttpService outboundHttpService,
                              BeachProvidersProperties props,
                              ObjectMapper objectMapper) {
-        this.webClient = webClientBuilder.build();
+        this.outboundHttpService = outboundHttpService;
         this.props = props;
         this.objectMapper = objectMapper;
     }
 
-    public JsonNode fetchObservations(double latitude, double longitude) {
+    public ParsedResponse fetchObservations(double latitude, double longitude) {
         String taxonIds = props.getJellyfishTaxonIds().stream()
                 .map(String::valueOf)
                 .collect(Collectors.joining(","));
@@ -45,17 +45,18 @@ public class InaturalistClient {
                 .queryParam("order_by", "observed_on")
                 .build()
                 .toUri();
-        Duration timeout = Duration.ofSeconds(props.getHttpTimeoutSeconds());
-        String body = webClient.get()
-                .uri(uri)
-                .retrieve()
-                .bodyToMono(String.class)
-                .timeout(timeout)
-                .block(timeout.plusSeconds(2));
+        var outcome = outboundHttpService.getJson(IntegrationSourceKey.INATURALIST, uri, "observations");
+        if (!outcome.success()) {
+            throw new IllegalStateException("iNaturalist fetch failed: " + outcome.errorMessage());
+        }
         try {
-            return objectMapper.readTree(body);
+            JsonNode tree = objectMapper.readTree(outcome.body());
+            return new ParsedResponse(tree, outcome.staleFallback(), outcome.shortCircuit());
         } catch (Exception e) {
             throw new IllegalStateException("iNaturalist JSON parse failed: " + e.getMessage(), e);
         }
+    }
+
+    public record ParsedResponse(JsonNode json, boolean staleFallback, boolean shortCircuit) {
     }
 }

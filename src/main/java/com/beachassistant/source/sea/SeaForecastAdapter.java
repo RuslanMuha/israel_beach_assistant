@@ -16,6 +16,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -58,8 +59,24 @@ public class SeaForecastAdapter implements SourceAdapter<SeaForecastRecord> {
             double lat = beach.getLatitude();
             double lon = beach.getLongitude();
 
-            JsonNode marine = openMeteoClient.fetchMarine(lat, lon);
-            JsonNode forecast = openMeteoClient.fetchForecast(lat, lon);
+            var marinePr = openMeteoClient.fetchMarine(lat, lon);
+            var forecastPr = openMeteoClient.fetchForecast(lat, lon);
+            JsonNode marine = marinePr.json();
+            JsonNode forecast = forecastPr.json();
+
+            List<String> httpWarnings = new ArrayList<>();
+            if (marinePr.staleFallback()) {
+                httpWarnings.add("STALE_HTTP_FALLBACK");
+            }
+            if (forecastPr.staleFallback()) {
+                httpWarnings.add("STALE_HTTP_FALLBACK");
+            }
+            if (marinePr.shortCircuit()) {
+                httpWarnings.add("HTTP_RESPONSE_SHORT_CIRCUIT");
+            }
+            if (forecastPr.shortCircuit()) {
+                httpWarnings.add("HTTP_RESPONSE_SHORT_CIRCUIT");
+            }
 
             JsonNode mHourly = marine.path("hourly");
             JsonNode fHourly = forecast.path("hourly");
@@ -109,9 +126,9 @@ public class SeaForecastAdapter implements SourceAdapter<SeaForecastRecord> {
                     .intervalIsInferred(false)
                     .rawPayloadJson(raw)
                     .build();
-            return FetchResult.success(sourceType(), List.of(record));
+            return FetchResult.success(sourceType(), List.of(record), httpWarnings);
         } catch (Exception e) {
-            log.error("Sea forecast fetch failed for beach={}: {}", request.getBeachSlug(), e.getMessage());
+            log.warn("Sea forecast fetch failed for beach={}: {}", request.getBeachSlug(), e.getMessage());
             return FetchResult.failure(sourceType(), e.getMessage());
         }
     }

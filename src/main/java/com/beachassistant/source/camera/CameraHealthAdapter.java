@@ -2,6 +2,8 @@ package com.beachassistant.source.camera;
 
 import com.beachassistant.common.enums.SourceType;
 import com.beachassistant.config.BeachProvidersProperties;
+import com.beachassistant.integration.IntegrationSourceKey;
+import com.beachassistant.integration.http.OutboundHttpService;
 import com.beachassistant.persistence.entity.BeachEntity;
 import com.beachassistant.persistence.entity.CameraEndpointEntity;
 import com.beachassistant.persistence.repository.BeachRepository;
@@ -11,9 +13,8 @@ import com.beachassistant.source.contract.SourceAdapter;
 import com.beachassistant.source.contract.SourceRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.client.WebClient;
 
-import java.time.Duration;
+import java.net.URI;
 import java.time.ZonedDateTime;
 import java.util.List;
 
@@ -27,16 +28,16 @@ public class CameraHealthAdapter implements SourceAdapter<CameraHealthRecord> {
     private final BeachProvidersProperties props;
     private final BeachRepository beachRepository;
     private final CameraEndpointRepository cameraEndpointRepository;
-    private final WebClient webClient;
+    private final OutboundHttpService outboundHttpService;
 
     public CameraHealthAdapter(BeachProvidersProperties props,
                                BeachRepository beachRepository,
                                CameraEndpointRepository cameraEndpointRepository,
-                               WebClient.Builder webClientBuilder) {
+                               OutboundHttpService outboundHttpService) {
         this.props = props;
         this.beachRepository = beachRepository;
         this.cameraEndpointRepository = cameraEndpointRepository;
-        this.webClient = webClientBuilder.build();
+        this.outboundHttpService = outboundHttpService;
     }
 
     @Override
@@ -64,20 +65,14 @@ public class CameraHealthAdapter implements SourceAdapter<CameraHealthRecord> {
                         .build();
                 return FetchResult.success(sourceType(), List.of(record));
             }
-            Duration timeout = Duration.ofSeconds(props.getHttpTimeoutSeconds());
-            boolean ok;
+            URI uri;
             try {
-                webClient.head()
-                        .uri(cam.getLiveUrl())
-                        .retrieve()
-                        .toBodilessEntity()
-                        .timeout(timeout)
-                        .block(timeout.plusSeconds(2));
-                ok = true;
-            } catch (Exception e) {
-                log.debug("Camera HEAD failed: {}", e.getMessage());
-                ok = false;
+                uri = URI.create(cam.getLiveUrl());
+            } catch (IllegalArgumentException e) {
+                return FetchResult.failure(sourceType(), "Invalid camera URL: " + cam.getLiveUrl());
             }
+            var head = outboundHttpService.head(IntegrationSourceKey.CAMERA, uri, "camera_head");
+            boolean ok = head.reachable();
             CameraHealthRecord record = CameraHealthRecord.builder()
                     .beachSlug(request.getBeachSlug())
                     .checkedAt(ZonedDateTime.now())
@@ -86,7 +81,7 @@ public class CameraHealthAdapter implements SourceAdapter<CameraHealthRecord> {
                     .build();
             return FetchResult.success(sourceType(), List.of(record));
         } catch (Exception e) {
-            log.error("Camera health fetch failed for beach={}: {}", request.getBeachSlug(), e.getMessage());
+            log.warn("Camera health fetch failed for beach={}: {}", request.getBeachSlug(), e.getMessage());
             return FetchResult.failure(sourceType(), e.getMessage());
         }
     }

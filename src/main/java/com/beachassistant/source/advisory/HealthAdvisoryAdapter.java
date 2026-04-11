@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -55,7 +56,15 @@ public class HealthAdvisoryAdapter implements SourceAdapter<HealthAdvisoryRecord
             if (beach.getLatitude() == null || beach.getLongitude() == null) {
                 return FetchResult.failure(sourceType(), "Beach has no coordinates: " + request.getBeachSlug());
             }
-            JsonNode aq = openMeteoClient.fetchAirQuality(beach.getLatitude(), beach.getLongitude());
+            var aqPr = openMeteoClient.fetchAirQuality(beach.getLatitude(), beach.getLongitude());
+            JsonNode aq = aqPr.json();
+            List<String> httpWarnings = new ArrayList<>();
+            if (aqPr.staleFallback()) {
+                httpWarnings.add("STALE_HTTP_FALLBACK");
+            }
+            if (aqPr.shortCircuit()) {
+                httpWarnings.add("HTTP_RESPONSE_SHORT_CIRCUIT");
+            }
             JsonNode hourly = aq.path("hourly");
             if (!hourly.has("time") || hourly.path("time").size() == 0) {
                 return FetchResult.failure(sourceType(), "Open-Meteo air quality: empty hourly");
@@ -82,9 +91,9 @@ public class HealthAdvisoryAdapter implements SourceAdapter<HealthAdvisoryRecord
                     .message(message)
                     .rawPayloadJson(raw)
                     .build();
-            return FetchResult.success(sourceType(), List.of(record));
+            return FetchResult.success(sourceType(), List.of(record), httpWarnings);
         } catch (Exception e) {
-            log.error("Health advisory fetch failed for beach={}: {}", request.getBeachSlug(), e.getMessage());
+            log.warn("Health advisory fetch failed for beach={}: {}", request.getBeachSlug(), e.getMessage());
             return FetchResult.failure(sourceType(), e.getMessage());
         }
     }

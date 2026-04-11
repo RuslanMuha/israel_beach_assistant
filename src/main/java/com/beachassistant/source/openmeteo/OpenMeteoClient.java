@@ -1,15 +1,15 @@
 package com.beachassistant.source.openmeteo;
 
 import com.beachassistant.config.BeachProvidersProperties;
+import com.beachassistant.integration.IntegrationSourceKey;
+import com.beachassistant.integration.http.OutboundHttpService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.net.URI;
-import java.time.Duration;
 
 /**
  * Open-Meteo: marine forecast, weather (wind/air), and CAMS-based air quality (no API key).
@@ -18,19 +18,22 @@ import java.time.Duration;
 @Component
 public class OpenMeteoClient {
 
-    private final WebClient webClient;
+    private final OutboundHttpService outboundHttpService;
     private final BeachProvidersProperties props;
     private final ObjectMapper objectMapper;
 
-    public OpenMeteoClient(WebClient.Builder webClientBuilder,
+    public OpenMeteoClient(OutboundHttpService outboundHttpService,
                            BeachProvidersProperties props,
                            ObjectMapper objectMapper) {
-        this.webClient = webClientBuilder.build();
+        this.outboundHttpService = outboundHttpService;
         this.props = props;
         this.objectMapper = objectMapper;
     }
 
-    public JsonNode fetchMarine(double latitude, double longitude) {
+    /**
+     * Parsed JSON plus flags when the resilient client served short-circuit or stale fallback bodies.
+     */
+    public ParsedResponse fetchMarine(double latitude, double longitude) {
         URI uri = UriComponentsBuilder.fromUriString(props.getOpenMeteoMarineUrl())
                 .queryParam("latitude", latitude)
                 .queryParam("longitude", longitude)
@@ -39,10 +42,10 @@ public class OpenMeteoClient {
                 .queryParam("timezone", props.getTimezone())
                 .build()
                 .toUri();
-        return getJson(uri);
+        return getParsed(uri, "marine");
     }
 
-    public JsonNode fetchForecast(double latitude, double longitude) {
+    public ParsedResponse fetchForecast(double latitude, double longitude) {
         URI uri = UriComponentsBuilder.fromUriString(props.getOpenMeteoForecastUrl())
                 .queryParam("latitude", latitude)
                 .queryParam("longitude", longitude)
@@ -51,10 +54,10 @@ public class OpenMeteoClient {
                 .queryParam("timezone", props.getTimezone())
                 .build()
                 .toUri();
-        return getJson(uri);
+        return getParsed(uri, "forecast");
     }
 
-    public JsonNode fetchAirQuality(double latitude, double longitude) {
+    public ParsedResponse fetchAirQuality(double latitude, double longitude) {
         URI uri = UriComponentsBuilder.fromUriString(props.getOpenMeteoAirQualityUrl())
                 .queryParam("latitude", latitude)
                 .queryParam("longitude", longitude)
@@ -63,21 +66,22 @@ public class OpenMeteoClient {
                 .queryParam("timezone", props.getTimezone())
                 .build()
                 .toUri();
-        return getJson(uri);
+        return getParsed(uri, "air_quality");
     }
 
-    private JsonNode getJson(URI uri) {
-        Duration timeout = Duration.ofSeconds(props.getHttpTimeoutSeconds());
-        String body = webClient.get()
-                .uri(uri)
-                .retrieve()
-                .bodyToMono(String.class)
-                .timeout(timeout)
-                .block(timeout.plusSeconds(2));
+    private ParsedResponse getParsed(URI uri, String operation) {
+        var outcome = outboundHttpService.getJson(IntegrationSourceKey.OPEN_METEO, uri, operation);
+        if (!outcome.success()) {
+            throw new IllegalStateException("Open-Meteo " + operation + " fetch failed: " + outcome.errorMessage());
+        }
         try {
-            return objectMapper.readTree(body);
+            JsonNode tree = objectMapper.readTree(outcome.body());
+            return new ParsedResponse(tree, outcome.staleFallback(), outcome.shortCircuit());
         } catch (Exception e) {
             throw new IllegalStateException("Open-Meteo JSON parse failed: " + e.getMessage(), e);
         }
+    }
+
+    public record ParsedResponse(JsonNode json, boolean staleFallback, boolean shortCircuit) {
     }
 }

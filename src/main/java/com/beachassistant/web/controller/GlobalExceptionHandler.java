@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.ZonedDateTime;
 import java.util.Map;
@@ -31,6 +32,15 @@ public class GlobalExceptionHandler {
                 "message", e.getMessage(),
                 "timestamp", ZonedDateTime.now().toString()
         ));
+    }
+
+    /**
+     * Static assets and browser probes (favicon, etc.) should not be logged as application faults.
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Void> handleNoResource(NoResourceFoundException e) {
+        log.debug("No resource: {}", e.getResourcePath());
+        return ResponseEntity.notFound().build();
     }
 
     @ExceptionHandler(Exception.class)

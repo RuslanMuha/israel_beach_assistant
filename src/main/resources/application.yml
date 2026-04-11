@@ -37,6 +37,9 @@ management:
     web:
       exposure:
         include: health,info,metrics,prometheus
+  health:
+    circuitbreakers:
+      enabled: true
   metrics:
     export:
       prometheus:
@@ -79,3 +82,68 @@ beach:
     advisory-rate-ms: 3600000        # 1 hour
     jellyfish-rate-ms: 7200000       # 2 hours
     camera-health-rate-ms: 900000    # 15 min
+
+  integration:
+    # In-memory JSON body cache (Caffeine); aligns with typical stale-fallback horizon
+    http-response-cache-ttl: 6h
+    open-meteo:
+      connect-timeout: 5s
+      read-timeout: 25s
+      max-retries: 4
+      initial-backoff: 300ms
+      max-backoff: 60s
+      backoff-multiplier: 2.0
+      short-circuit-ttl: 12m
+      stale-fallback-max-age: 6h
+      pacing-millis-between-requests: 120
+    inaturalist:
+      connect-timeout: 5s
+      read-timeout: 30s
+      max-retries: 3
+      initial-backoff: 400ms
+      max-backoff: 90s
+      backoff-multiplier: 2.0
+      short-circuit-ttl: 20m
+      stale-fallback-max-age: 6h
+      pacing-millis-between-requests: 200
+    camera:
+      connect-timeout: 5s
+      read-timeout: 12s
+      max-retries: 2
+      initial-backoff: 200ms
+      max-backoff: 20s
+      backoff-multiplier: 2.0
+      short-circuit-ttl: 0s
+      stale-fallback-max-age: 0s
+      pacing-millis-between-requests: 0
+    ingestion:
+      batch-size: 25
+      max-concurrent-beaches: 2
+      pacing-millis-between-beaches: 0
+    scheduler:
+      skip-if-overlap: true
+      initial-delay-ms: 90000
+
+resilience4j:
+  circuitbreaker:
+    configs:
+      integration-default:
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 50
+        minimumNumberOfCalls: 20
+        failureRateThreshold: 50
+        slowCallRateThreshold: 100
+        slowCallDurationThreshold: 45s
+        permittedNumberOfCallsInHalfOpenState: 10
+        maxWaitDurationInHalfOpenState: 30s
+        waitDurationInOpenState: 90s
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+        recordExceptions:
+          - com.beachassistant.integration.http.OutboundCallsFailedException
+    instances:
+      integration-open-meteo:
+        baseConfig: integration-default
+      integration-inaturalist:
+        baseConfig: integration-default
+      integration-camera:
+        baseConfig: integration-default
