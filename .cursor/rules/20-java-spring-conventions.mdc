@@ -1,0 +1,100 @@
+# Java and Spring Conventions
+
+## Java
+- Prefer Java 21 language features when they improve clarity and do not obscure behavior.
+- Use records for simple immutable request/response DTOs.
+- Replace boolean soups with enums or explicit state objects when more than two meaningful states exist.
+
+## Dependency injection style
+- For Spring-managed beans with injectable dependencies, use Lombok `@RequiredArgsConstructor` whenever possible.
+- Manual DI constructors are forbidden unless there is a concrete technical reason.
+- Allowed reasons for a manual constructor are limited to:
+  - constructor logic,
+  - parameter annotations,
+  - framework/library incompatibility,
+  - multiple constructors required by design.
+- If a manual constructor is used, the reason must be stated explicitly in the response.
+- Field injection is forbidden in production code.
+- Setter injection is forbidden in production code.
+
+## Lombok logging
+- When Lombok is used in the project, use `@Slf4j` for logging by default.
+- Do not declare manual SLF4J logger fields such as `private static final Logger log = LoggerFactory.getLogger(...)` unless there is a concrete technical reason.
+- Allowed exceptions are limited to:
+  - a class where Lombok annotations are not permitted by project/framework constraints,
+  - a technical limitation that prevents Lombok logger generation,
+  - a repository convention explicitly forbidding Lombok in that specific layer/module.
+- If a manual logger is used, the reason must be explicit in the response.
+
+## Configuration style
+- Prefer `@ConfigurationProperties` for grouped application settings such as limits, retry counts, TTLs, code lengths, feature flags, time budgets, and thresholds.
+- Use `@Value` only for truly isolated single-value wiring where typed grouped config would not improve clarity.
+
+## Time source
+- Do not call `now()` directly in business/application code when testability matters.
+- Inject `Clock` and derive the current time from it.
+- Read the current time once per use case unless multiple distinct timestamps are intentionally required.
+
+## Spring wiring
+- Prefer explicit package structure and deterministic bean wiring.
+- Avoid accidental bean ambiguity. Use `@Qualifier` or `@Primary` deliberately.
+- For optional or environment-specific features, prefer `@Profile`, `@ConditionalOnProperty`, or `@ConditionalOnClass` over hidden bean replacement.
+- Keep environment-specific bean wiring explicit for local, test, and production differences.
+
+## Starter-first integration
+- Prefer official Spring Boot starters and existing auto-configuration before writing manual wiring code.
+- Prefer property-driven configuration when the starter already exposes the integration cleanly through Boot conventions.
+- Do not create manual `@Bean`, factory, or custom configuration classes for concerns already handled cleanly by a starter plus typed properties.
+- Manual wiring is justified when a starter is unavailable, insufficient, ambiguous for multiple beans, or a custom policy must be expressed explicitly in code.
+- Do not bypass Boot auto-configuration without a concrete reason.
+
+## Spring MVC conventions
+- Prefer explicit media type and response semantics when they are part of the API contract.
+- Use `@Valid` at the HTTP boundary when request DTO validation constraints are expected to be enforced automatically.
+- Request DTOs must be validated using Jakarta Bean Validation annotations.
+- When built-in validation annotations are insufficient, use custom constraints rather than ad-hoc controller validation.
+
+## API documentation
+- If the project requires OpenAPI/Swagger, every public REST endpoint must include the annotations and metadata required by the repository standard.
+- If the repository convention uses API interfaces for documentation, define endpoint documentation on interfaces and make controllers implement those interfaces.
+- Document operation purpose, main response codes, and request/response models consistently.
+- Do not leave API documentation partial when the endpoint itself is implemented.
+
+## Dependency hygiene
+- Prefer Spring Boot starters and BOM-managed versions.
+- Do not mix competing libraries for the same concern without a deliberate documented choice.
+- Root build owns shared plugin and dependency version management in multi-module projects.
+
+## OpenAPI interface convention
+- If the repository uses interface-based OpenAPI documentation, the interface is documentation-only.
+- Documentation interfaces may contain OpenAPI annotations only.
+- Documentation interfaces must not contain runtime Spring MVC mapping annotations or runtime validation annotations.
+- Controllers implement documentation interfaces, but controllers own:
+  - Spring MVC mappings
+  - request binding annotations
+  - validation trigger annotations
+  - response status semantics
+- Do not duplicate parameter validation constraints across an interface method and its implementing controller method.
+
+## Utility classes
+- Utility classes are allowed only for small stateless reusable helper logic.
+- Utility classes must be `final`.
+- Utility classes must have a private no-args constructor.
+- Utility classes must contain only `static` members.
+- Utility classes must not hold mutable state.
+- Utility classes must not contain business logic or hidden dependencies.
+- Do not create generic dumping-ground classes such as `CommonUtils`, `AppUtils`, or `HelperUtils`.
+- Prefer a properly named validator, mapper, formatter, parser, or policy class when the logic has a specific responsibility.
+
+
+## Configuration properties validation
+- `@ConfigurationProperties` classes must declare validation for required fields, ranges, formats, and nested objects when invalid values can break runtime behavior.
+- Prefer Bean Validation annotations such as `@NotBlank`, `@NotNull`, `@Positive`, `@Min`, `@Max`, `@DurationMin`, `@DurationMax`, `@Pattern`, and `@Valid` over manual post-bind checks.
+- Enable validation on configuration binding explicitly according to project style (`@Validated` / constructor binding validation).
+- Do not allow silently invalid defaults for ports, credentials, URLs, durations, pool sizes, retry counts, or feature-critical toggles.
+
+## String literals and text blocks
+- Prefer Java text blocks `"""` for large static multiline strings without runtime interpolation or argument substitution.
+- Especially prefer text blocks for SQL, JSON examples, templates, multiline messages, and test fixtures when they improve readability.
+- Do not use string concatenation for large static multiline literals when a text block expresses the content more clearly.
+- Keep simple one-line strings as normal string literals.

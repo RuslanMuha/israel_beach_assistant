@@ -1,0 +1,10 @@
+target/
+.git
+.gitignore
+.cursor
+.idea
+*.iml
+**/.DS_Store
+*.log
+agent-transcripts
+mcps

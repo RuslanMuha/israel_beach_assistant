@@ -1,0 +1,74 @@
+# Testing Rule
+
+## Testing objectives
+- Tests must detect regressions in observable behavior, not merely execute code paths.
+- Prefer tests that would fail for the intended defect class if production behavior is broken.
+- A green build is not enough; the test suite must provide meaningful defect detection for the changed scope.
+
+## FIRST principles
+- Fast: default to the narrowest realistic scope that verifies the behavior.
+- Independent: tests must not depend on execution order or shared mutable state across test cases.
+- Repeatable: results must be stable across machines, runs, and time zones.
+- Self-validating: assertions must unambiguously determine pass/fail without manual inspection.
+- Timely: write or update tests as part of the implementation, not as an afterthought.
+
+## Test value and realism
+- Every test must verify a concrete contract, behavior, state transition, emitted interaction, persisted effect, or error semantic.
+- Do not write tests that only prove the code executed without checking meaningful outcomes.
+- Avoid trivial assertions such as `notNull`, `true`, `isPresent`, or `size > 0` unless they are the real contract under test.
+- Do not mirror implementation details as the primary test value when observable behavior can be asserted directly.
+- If deleting or breaking the intended behavior would still leave the test green, the test is insufficient.
+- Prefer assertions on externally visible results over internal call choreography unless the contract is explicitly interaction-based.
+
+## Test scope selection
+- Choose the narrowest test type that can verify the target behavior honestly.
+- Prefer plain unit tests for domain logic, calculation, branching, mapping, policy, and orchestration that do not require Spring wiring.
+- Prefer Spring slice tests over full `@SpringBootTest` when only web, data, or serialization boundaries need verification.
+- Use integration tests when behavior depends on real infrastructure semantics such as SQL, transaction boundaries, containerized services, serialization integration, HTTP contracts, or adapter wiring.
+- If a test loads the full application context, justify why a narrower slice or plain unit test is insufficient.
+
+## Mock and stub discipline
+- Mock only dependencies that are outside the scope of the behavior being verified.
+- Do not add mocks that do not affect the asserted behavior.
+- Prefer real value objects, DTOs, collections, mappers, and simple pure collaborators over mocks when they are cheap and clearer.
+- Do not over-specify irrelevant interactions.
+- Do not verify interactions that are incidental rather than part of the contract.
+- Unused stubs are a design smell in the test and must be removed.
+- Do not use `lenient()` merely to silence unused stubs or avoid strict-stubbing failures.
+- `lenient()` is acceptable only when a shared fixture is intentionally reused across scenarios and the leniency is explicitly justified by readability rather than convenience.
+- Do not use partial mocks or spies to work around poor production design when a small refactor would create a cleaner seam.
+
+## Reflection and design smell detection
+- Do not use reflection in tests to reach private fields or private methods just to make a poorly designed class testable.
+- If reflection is needed to verify business behavior, treat that primarily as a production design smell and evaluate refactoring for testability.
+- Reflection in tests is acceptable only when reflection itself is part of the contract or the framework integration under test, such as annotation metadata, serialization wiring, framework callbacks, or library integration.
+- Do not test private methods directly; test observable behavior through public or package-level seams.
+
+## Design for testability
+- During implementation, choose boundaries that allow time, randomness, external I/O, IDs, configuration, and side effects to be controlled without reflection or full-context bootstrapping.
+- Prefer explicit seams such as injected `Clock`, ID generator abstractions, adapter interfaces, or narrow collaborators when they improve honest verification.
+- Do not bury orchestration or branching-heavy logic inside framework callbacks, static helpers, or large configuration classes when a testable service or collaborator would be clearer.
+- If a class becomes hard to test without Spring, reflection, or global state manipulation, reconsider the design before expanding the test workaround.
+
+## Parameterization and duplication
+- Use parameterized tests when the same behavior is verified across a table of inputs and outcomes.
+- Do not duplicate many near-identical test methods that differ only in data.
+- Do not parameterize tests when doing so would hide scenario intent, degrade readability, or make failures harder to interpret.
+
+## Test data and fixtures
+- Keep fixtures minimal and purpose-built for the scenario.
+- Do not create oversized object graphs when a smaller fixture expresses the behavior more clearly.
+- Prefer factory methods, builders, or focused fixture helpers when they reduce noise without hiding important scenario details.
+- Do not use random data unless determinism is preserved and the randomness itself is part of the test goal.
+
+## Profiles and environment isolation
+- Use dedicated test profiles when integration tests require different infrastructure wiring from production.
+- Test-only infrastructure must not leak into production configuration.
+- Prefer containerized or realistic local-safe dependencies for integration paths instead of fragile ad-hoc workarounds.
+- Do not replace a blocked integration with a fake green result.
+
+## Verification honesty
+- State exactly which tests were run, skipped by design, not executed, or blocked by the environment.
+- A blocked test is not a passed test.
+- Do not downgrade a failing or blocked integration path into a skipped test just to make the suite green.
+- Do not claim coverage for behavior that was not actually verified.

@@ -1,0 +1,9 @@
+.env
+target/
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+.cursor/hooks.log
+.cursor/session-summary.txt

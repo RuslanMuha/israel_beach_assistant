@@ -1,0 +1,13 @@
+package com.beachassistant.common.enums;
+
+public enum ReasonCode {
+    SEA_RISK_HIGH,
+    SEA_RISK_SEVERE,
+    HEALTH_ADVISORY_ACTIVE,
+    LIFEGUARDS_OFF_DUTY,
+    NO_FRESH_DATA,
+    JELLYFISH_REPORTS_HIGH,
+    BEACH_TEMPORARILY_CLOSED,
+    CAMERA_UNAVAILABLE,
+    SOURCE_CONFLICT
+}

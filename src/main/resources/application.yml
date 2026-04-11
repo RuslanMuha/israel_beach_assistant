@@ -1,0 +1,81 @@
+server:
+  port: ${PORT:8080}
+
+spring:
+  application:
+    name: beach-assistant
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/beach_assistant}
+    username: ${SPRING_DATASOURCE_USERNAME:beach}
+    password: ${SPRING_DATASOURCE_PASSWORD:beach}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+    deserialization:
+      fail-on-unknown-properties: false
+    time-zone: Asia/Jerusalem
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+beach:
+  telegram:
+    mode: ${BEACH_TELEGRAM_MODE:polling}
+    token: ${TELEGRAM_BOT_TOKEN:CONFIGURE_ME}
+    username: ${TELEGRAM_BOT_USERNAME:israelBeach_bot}
+    # Public HTTPS origin only (no path). Used to build setWebhook URL when mode=webhook.
+    public-base-url: ${TELEGRAM_PUBLIC_BASE_URL:${TELEGRAM_WEBHOOK_BASE_URL:}}
+    webhook-path: ${BEACH_TELEGRAM_WEBHOOK_PATH:/api/telegram/webhook}
+    webhook-auto-register: ${BEACH_TELEGRAM_WEBHOOK_AUTO_REGISTER:true}
+    webhook-secret-token: ${TELEGRAM_WEBHOOK_SECRET:}
+
+  # Open-Meteo (marine, weather, CAMS air quality) + iNaturalist — no API keys.
+  # Set stub: true for offline tests (see application-test.yml).
+  providers:
+    stub: false
+    timezone: Asia/Jerusalem
+    air-quality-advisory-threshold: 50
+    jellyfish-search-radius-km: 12
+    http-timeout-seconds: 15
+    # WebClient body buffer (bytes); iNaturalist JSON may exceed default 256 KiB
+    http-max-response-buffer-bytes: ${BEACH_HTTP_MAX_RESPONSE_BUFFER_BYTES:5242880}
+
+  freshness:
+    default-fresh-hours: 24
+    default-stale-hours: 72
+    fresh-hours-override:
+      SEA_FORECAST: 6
+      CAMERA_HEALTH: 1
+    stale-hours-override:
+      SEA_FORECAST: 24
+      CAMERA_HEALTH: 3
+
+  scheduler:
+    sea-forecast-rate-ms: 1800000    # 30 min
+    advisory-rate-ms: 3600000        # 1 hour
+    jellyfish-rate-ms: 7200000       # 2 hours
+    camera-health-rate-ms: 900000    # 15 min

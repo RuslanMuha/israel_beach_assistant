@@ -1,0 +1,44 @@
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: beach_assistant
+      POSTGRES_USER: beach
+      POSTGRES_PASSWORD: beach
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U beach -d beach_assistant"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    init: true
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      PORT: "8080"
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/beach_assistant
+      SPRING_DATASOURCE_USERNAME: beach
+      SPRING_DATASOURCE_PASSWORD: beach
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-CONFIGURE_ME}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-beach_assistant_bot}
+      BEACH_TELEGRAM_MODE: ${BEACH_TELEGRAM_MODE:-polling}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/actuator/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+volumes:
+  postgres_data:

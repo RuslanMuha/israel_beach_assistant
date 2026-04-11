@@ -1,0 +1,40 @@
+# Errors, Logging, and Observability
+
+## Error contract
+- Use one centralized HTTP error mapping strategy.
+- Error responses must expose a stable machine-readable code and must not leak stack traces, SQL, internal URLs, framework internals, or parser/library wording that is not intentionally stabilized.
+- Use consistent HTTP semantics: 4xx for client/business issues, 5xx for system issues.
+
+## Error typing
+- Do not throw generic `RuntimeException` from application services for expected failure modes or classified system failures.
+- Use specific exception types that map cleanly to stable error codes and centralized ProblemDetail responses.
+- Do not expose parser/library wording directly as the public API error contract unless that wording is intentionally stabilized.
+
+## Correlation
+- Every request must have a correlation identifier.
+- If tracing exists, include trace/span identifiers. If it does not, generate a request identifier at the boundary and propagate it through logs.
+
+## Logging
+- Log at the owning boundary. Do not log the same failure at controller, service, and client layers.
+- Use structured logs with parameterized arguments. No string concatenation, `String.format`, or eager serialization in log statements.
+- Do not log full payloads, secrets, credentials, tokens, or raw PII.
+- On hot paths, prefer metrics and traces over per-request INFO/WARN logs.
+
+## Metrics and traces
+- Emit timers/counters for normal-path visibility.
+- Avoid high-cardinality tags such as requestId, userId, raw URL, or exception message.
+- Child spans belong around outbound calls and meaningful async boundaries.
+
+
+## Observability placement
+- Metrics, timers, counters, tracing helpers, and `MeterRegistry` wiring are observability concerns, not business rules.
+- Do not inject multiple raw Micrometer primitives into a business service when a cohesive dedicated collaborator would make the boundary clearer.
+- When instrumentation is more than a single trivial counter, extract it into a dedicated component such as `*Metrics`, `*Observation`, or `*Telemetry`.
+- Business services should depend on a small intent-level collaborator (`recordCacheHit()`, `recordLookupLatency(...)`) instead of assembling metric names/tags inline.
+- Metric name construction, tag policy, histogram/percentile configuration, and meter registration belong in dedicated observability code or configuration, not in orchestration logic.
+- Keep observability side effects lightweight and non-blocking on hot paths.
+- If a class starts mixing orchestration with timers/counters/registry/tag policy, split the observability concern out unless the instrumentation is truly one-line and local.
+
+## Failure noise control
+- Retry loops, batch loops, and polling loops must not emit one WARN/ERROR per attempt/item.
+- Use summary logs, sampling, or rate limiting for noisy paths.

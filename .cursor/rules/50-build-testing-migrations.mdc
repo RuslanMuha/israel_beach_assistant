@@ -1,0 +1,39 @@
+# Build, Testing, and Migrations
+
+## Build hygiene
+- Use a single source of truth for dependency versions and plugin versions.
+- Child modules must not pin versions already managed centrally.
+- Use the project wrapper (`./mvnw` or equivalent) for reproducible builds.
+
+## Milestone completeness
+- Implement everything explicitly required by the milestone, even if some parts are preparatory and not yet exercised by a controller or feature flow.
+- Do not skip milestone-scoped infrastructure just because no current endpoint uses it yet.
+- Before marking a milestone complete, explicitly verify that every milestone requirement was either implemented, intentionally deferred with explanation, blocked, or not applicable.
+
+## Infrastructure-first artifacts
+- The following may be required before the first business endpoint exists:
+  - OpenAPI/Swagger base configuration
+  - global exception handling
+  - typed configuration classes
+  - profile-specific configuration
+  - Actuator/health configuration
+  - Liquibase master changelog structure
+  - test infrastructure wiring
+- Do not defer these automatically just because no controller or business flow consumes them yet.
+
+## Database migrations
+- All schema changes go through Liquibase.
+- Use YAML as the master changelog format.
+- Store each schema migration in a separate SQL file.
+- The master YAML changelog must include SQL migration files explicitly and in order.
+- Do not put multiple unrelated schema changes into one SQL migration file.
+- SQL migration file names must describe the actual change, for example:
+  - `001-create-url-mapping-table.sql`
+  - `002-add-unique-index-on-short-code.sql`
+  - `003-add-expires-at-column.sql`
+- Do not use generic file names such as `master.sql`, `init.sql`, or `migration.sql` for actual schema change files.
+- Do not generate a single `db.changelog-master.sql` file as the primary migration structure when the repository convention is YAML master changelog plus separate SQL migration files.
+- Prefer small, additive, rollout-safe changes.
+- Prefer expand -> migrate -> contract for changes that affect running code.
+- Never edit an already applied migration. Add a new migration instead.
+- Large backfills must be batched, resumable, observable, and throttled.

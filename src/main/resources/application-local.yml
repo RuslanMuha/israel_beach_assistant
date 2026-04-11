@@ -1,0 +1,11 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/beach_assistant
+    username: beach
+    password: beach
+  jpa:
+    show-sql: true
+
+logging:
+  level:
+    com.beachassistant: DEBUG

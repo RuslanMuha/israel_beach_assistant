@@ -1,0 +1,96 @@
+# Architecture and Layering
+
+## Dependency direction
+- Dependencies flow inward: web -> application -> domain -> infrastructure adapters.
+- Controllers must not call repositories or external clients directly.
+- Domain code must not depend on Spring Web, persistence APIs, HTTP client types, or transport DTOs.
+
+## Controller
+- Responsibilities: request mapping, bean validation trigger, auth/context extraction, service call, response mapping.
+- Keep controllers thin: no business branching, loops, persistence access, outbound HTTP calls, or duplicate error logging.
+- Controllers must not expose JPA entities directly as API request or response models.
+- For request DTOs with bean validation constraints, trigger validation at the HTTP boundary. Prefer annotation-based bean validation on DTOs over imperative controller/service validation when the rule is declarative and field-local.
+- If built-in bean validation constraints are insufficient, introduce a custom constraint before adding repetitive manual validation code.
+- For creation endpoints, choose response semantics explicitly:
+  - return `201 Created` for successful resource creation
+  - return a `Location` header when the API has a canonical URI for the created resource
+- Prefer resource-oriented route naming (`/resources`) over verb-style route naming (`/doSomething`) unless the endpoint is not modeling a resource.
+- If the repository convention requires documented API interfaces, controllers implement those interfaces instead of duplicating endpoint contract annotations locally.
+
+## Application service
+- Own orchestration, transactional boundaries, idempotency boundaries, and business decisions.
+- Prefer use-case oriented services over large multi-purpose services.
+- Application services must not depend on concrete infrastructure implementations such as `*JdbcRepository`, `*JpaRepository`, or transport-specific client classes directly.
+- Application services depend on stable repository/client abstractions or adapter-facing contracts.
+- Keep orchestration in the service, but extract cohesive collaborators when validation, generation, and persistence concerns have clearly diverged.
+- Do not return null as a business outcome.
+- Application services must not become holders of cross-cutting implementation details when those details can be isolated behind a narrow collaborator.
+- If observability, concurrency coordination, resilience mechanics, or cache-miss deduplication start dominating a service, extract them into dedicated collaborators and keep the service focused on the use case.
+
+## Domain
+- Keep invariants, state transitions, and calculations here when they are core to the business model.
+- Protect invariants with methods and explicit types instead of public mutable state.
+
+## Infrastructure
+- Infrastructure adapts DB, cache, messaging, file storage, and HTTP integrations.
+- Infrastructure must not contain business decisions.
+- Retry, circuit breaker, transport-specific error handling, and storage-client specifics belong at the boundary adapter, not in controllers or domain.
+
+## Mapping and boundaries
+- Use explicit request/response DTOs at the HTTP boundary.
+- Mapping code must not call DB, HTTP, cache, or embed business rules.
+- API contract decisions must be explicit: method, path, request shape, response shape, status codes, documentation, and validation behavior.
+
+## Abstraction discipline
+- Do not introduce an abstraction before naming the instability or variation it isolates.
+- Extract a dedicated component only when it has a stable responsibility, not just to make a class shorter.
+- Do not keep multiple responsibilities in one class once their change drivers have clearly diverged.
+- Extract a port/interface only when it improves testability or isolates a volatile dependency. Do not create ports for trivial stable dependencies.
+- Before making a class generic or reusable, name the expected reuse scope explicitly:
+  - only this method
+  - only this use case
+  - multiple places in this feature
+  - multiple places in this project
+  - cross-project/library candidate
+
+- Do not generalize from a single use site unless:
+  - the mechanism is clearly domain-agnostic, and
+  - the contract is already obvious, and
+  - the extraction reduces coupling or duplication now, not only hypothetically later.
+
+- Prefer feature-local concrete helpers over generic abstractions when the behavior is still strongly shaped by one use case.
+
+- Prefer a reusable abstraction when:
+  - the logic is domain-agnostic,
+  - the responsibility is stable,
+  - at least one additional realistic reuse point exists in the same feature or project, or the mechanism is an obvious technical primitive,
+  - the abstraction has a narrow contract,
+  - extraction improves testability, isolation, or readability.
+
+- Do not make a class generic just because the implementation uses templates such as `<K, V>` or could theoretically be reused.
+- Generic extraction is justified by stable responsibility and realistic reuse, not by possibility alone.
+
+## Concern separation heuristics
+- Before adding logic to an existing class, identify whether the new code is:
+  - business decision/orchestration
+  - infrastructure concern
+  - cross-cutting concern
+  - low-level technical mechanism
+- If a class starts mixing multiple concern types, prefer extracting the non-business concern into a dedicated component.
+
+- Treat the following as non-business concerns by default:
+  - metrics, counters, timers, meter registries
+  - logging structure and log enrichment
+  - retries, backoff, timeout waiting
+  - low-level concurrency coordination
+  - cache stampede protection / single-flight mechanics
+  - raw configuration access and parsing
+  - HTTP/client/storage framework details
+
+- Application services SHOULD remain focused on:
+  - orchestration
+  - business decisions
+  - transaction boundaries
+  - explicit use-case flow
+
+- If a class contains both use-case logic and low-level mechanics such as `ConcurrentHashMap`, `CompletableFuture`, raw Micrometer primitives, retry loops, or framework-specific plumbing, treat that as a design smell and evaluate extraction.

@@ -1,0 +1,23 @@
+# Render blueprint (Web Service). Add a PostgreSQL instance in the dashboard and set JDBC URL.
+# Docs: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: beach-assistant
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: BEACH_TELEGRAM_MODE
+        value: webhook
+      - key: BEACH_TELEGRAM_WEBHOOK_AUTO_REGISTER
+        value: "true"
+      # Set in the Render dashboard (secrets / generated values):
+      # PORT — injected by Render (do not override unless needed)
+      # SPRING_DATASOURCE_URL, SPRING_DATASOURCE_USERNAME, SPRING_DATASOURCE_PASSWORD — from PostgreSQL
+      # TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME
+      # TELEGRAM_PUBLIC_BASE_URL — https://<your-service>.onrender.com (no path, no trailing slash)
+      # Optional: TELEGRAM_WEBHOOK_SECRET, BEACH_TELEGRAM_WEBHOOK_PATH
