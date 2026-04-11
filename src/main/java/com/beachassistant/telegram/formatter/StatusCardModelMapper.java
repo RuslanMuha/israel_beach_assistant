@@ -1,5 +1,6 @@
 package com.beachassistant.telegram.formatter;
 
+import com.beachassistant.common.enums.FreshnessStatus;
 import com.beachassistant.common.enums.ReasonCode;
 import com.beachassistant.common.enums.Recommendation;
 import com.beachassistant.common.enums.SourceType;
@@ -280,8 +281,21 @@ public class StatusCardModelMapper {
             parts.add("meteo");
         }
         if (parts.isEmpty()) {
+            FreshnessStatus advisoryFreshness = d.getSourceFreshness() != null
+                    ? d.getSourceFreshness().get(SourceType.HEALTH_ADVISORY)
+                    : null;
+            if (advisoryFreshness == FreshnessStatus.EXPIRED) {
+                return Optional.of("Воздух: данные временно недоступны, показываю последнюю успешную запись.");
+            }
             return Optional.empty();
         }
-        return Optional.of("Данные: " + String.join(" + ", parts));
+        StringBuilder line = new StringBuilder("Данные: " + String.join(" + ", parts));
+        FreshnessStatus advisoryFreshness = d.getSourceFreshness() != null
+                ? d.getSourceFreshness().get(SourceType.HEALTH_ADVISORY)
+                : null;
+        if (advisoryFreshness == FreshnessStatus.EXPIRED) {
+            line.append(". Воздух: данные временно недоступны, показываю последнюю успешную запись.");
+        }
+        return Optional.of(line.toString());
     }
 }

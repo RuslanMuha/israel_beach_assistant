@@ -1,5 +1,7 @@
 package com.beachassistant.integration;
 
+import com.beachassistant.app.usecase.IngestionUseCase;
+import com.beachassistant.common.enums.SourceType;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -23,6 +25,9 @@ class BeachStatusIntegrationTest {
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
+    private IngestionUseCase ingestionUseCase;
+
     @Test
     void listBeaches_shouldReturnAshdodBeaches() throws Exception {
         mockMvc.perform(get("/api/v1/beaches"))
@@ -40,13 +45,8 @@ class BeachStatusIntegrationTest {
 
     @Test
     void getStatus_yudAlef_shouldReturnDecision() throws Exception {
-        // First run ingestion so that snapshots exist
-        mockMvc.perform(post("/api/v1/admin/ingest/SEA_FORECAST"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status", is("SUCCESS")));
-
-        mockMvc.perform(post("/api/v1/admin/ingest/HEALTH_ADVISORY"))
-                .andExpect(status().isOk());
+        ingestionUseCase.ingest(SourceType.SEA_FORECAST);
+        ingestionUseCase.ingest(SourceType.HEALTH_ADVISORY);
 
         mockMvc.perform(get("/api/v1/beaches/yud-alef/status"))
                 .andExpect(status().isOk())
@@ -66,8 +66,7 @@ class BeachStatusIntegrationTest {
 
     @Test
     void getJellyfish_yudAlef_afterIngest_shouldReturnData() throws Exception {
-        mockMvc.perform(post("/api/v1/admin/ingest/JELLYFISH"))
-                .andExpect(status().isOk());
+        ingestionUseCase.ingest(SourceType.JELLYFISH);
 
         mockMvc.perform(get("/api/v1/beaches/yud-alef/jellyfish"))
                 .andExpect(status().isOk())

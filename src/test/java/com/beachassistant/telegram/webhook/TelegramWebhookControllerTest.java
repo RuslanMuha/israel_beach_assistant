@@ -5,8 +5,10 @@ import com.beachassistant.telegram.handler.BeachBotUpdateProcessor;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import com.beachassistant.config.SecurityConfig;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -18,6 +20,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(controllers = TelegramWebhookController.class)
 @EnableConfigurationProperties(TelegramProperties.class)
+@Import(SecurityConfig.class)
 @TestPropertySource(properties = {
         "beach.telegram.mode=webhook",
         "beach.telegram.token=test-token",

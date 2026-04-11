@@ -56,7 +56,13 @@ public class HealthAdvisoryAdapter implements SourceAdapter<HealthAdvisoryRecord
             if (beach.getLatitude() == null || beach.getLongitude() == null) {
                 return FetchResult.failure(sourceType(), "Beach has no coordinates: " + request.getBeachSlug());
             }
-            var aqPr = openMeteoClient.fetchAirQuality(beach.getLatitude(), beach.getLongitude());
+            double lat = props.advisoryProviderLocationForBeach(beach.getSlug())
+                    .map(BeachProvidersProperties.ProviderLocation::getLatitude)
+                    .orElse(beach.getLatitude());
+            double lon = props.advisoryProviderLocationForBeach(beach.getSlug())
+                    .map(BeachProvidersProperties.ProviderLocation::getLongitude)
+                    .orElse(beach.getLongitude());
+            var aqPr = openMeteoClient.fetchAirQuality(lat, lon);
             JsonNode aq = aqPr.json();
             List<String> httpWarnings = new ArrayList<>();
             if (aqPr.staleFallback()) {
@@ -96,6 +102,13 @@ public class HealthAdvisoryAdapter implements SourceAdapter<HealthAdvisoryRecord
             log.warn("Health advisory fetch failed for beach={}: {}", request.getBeachSlug(), e.getMessage());
             return FetchResult.failure(sourceType(), e.getMessage());
         }
+    }
+
+    public String providerLocationKeyForBeach(BeachEntity beach) {
+        return props.getAdvisoryProviderLocationByBeach().getOrDefault(
+                beach.getSlug(),
+                "coords:" + beach.getLatitude() + "," + beach.getLongitude()
+        );
     }
 
     private FetchResult<HealthAdvisoryRecord> stubFetch(SourceRequest request) {

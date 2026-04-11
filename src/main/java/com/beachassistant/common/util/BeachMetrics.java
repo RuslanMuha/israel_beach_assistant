@@ -142,4 +142,25 @@ public class BeachMetrics {
                 .register(registry)
                 .increment();
     }
+
+    public void recordIngestionSkippedFresh(SourceType sourceType) {
+        Counter.builder("ingestion_skipped_fresh_total")
+                .tag("source", sourceType.name())
+                .register(registry)
+                .increment();
+    }
+
+    public void recordIngestionReusedLastSnapshot(SourceType sourceType) {
+        Counter.builder("ingestion_reused_last_snapshot_total")
+                .tag("source", sourceType.name())
+                .register(registry)
+                .increment();
+    }
+
+    public void recordIngestionGroupedFetch(SourceType sourceType) {
+        Counter.builder("ingestion_grouped_fetch_total")
+                .tag("source", sourceType.name())
+                .register(registry)
+                .increment();
+    }
 }

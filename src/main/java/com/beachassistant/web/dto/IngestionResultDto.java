@@ -10,6 +10,7 @@ import java.time.ZonedDateTime;
 @Builder
 public class IngestionResultDto {
 
+    private final Long runId;
     private final SourceType sourceType;
     private final ZonedDateTime startedAt;
     private final ZonedDateTime finishedAt;

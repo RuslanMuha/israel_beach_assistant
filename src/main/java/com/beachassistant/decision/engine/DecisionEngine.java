@@ -2,7 +2,6 @@ package com.beachassistant.decision.engine;
 
 import com.beachassistant.common.enums.*;
 import com.beachassistant.common.util.TimeUtil;
-import com.beachassistant.decision.freshness.FreshnessService;
 import com.beachassistant.domain.model.BeachDecision;
 import com.beachassistant.domain.model.BeachSignals;
 import org.springframework.stereotype.Service;
@@ -14,22 +13,21 @@ import java.util.Map;
 @Service
 public class DecisionEngine {
 
-    private final FreshnessService freshnessService;
-
-    public DecisionEngine(FreshnessService freshnessService) {
-        this.freshnessService = freshnessService;
+    public DecisionEngine() {
     }
 
     public BeachDecision evaluate(BeachSignals signals) {
         List<ReasonCode> reasons = new ArrayList<>();
         List<SourceType> missing = new ArrayList<>(signals.getFetchFailures().keySet());
 
-        // Determine overall freshness
-        FreshnessStatus overallFreshness = freshnessService.worstCase(signals.getSourceFreshness().values());
+        FreshnessStatus seaFreshness = sourceFreshness(signals, SourceType.SEA_FORECAST);
+        FreshnessStatus advisoryFreshness = sourceFreshness(signals, SourceType.HEALTH_ADVISORY);
+        FreshnessStatus overallFreshness = computeOverallFreshness(signals, seaFreshness);
+        boolean hasUsableSeaData = isFreshOrStale(seaFreshness);
 
         // Priority 1: hard blocks
         if (signals.isHealthAdvisoryActive() &&
-                isFreshOrStale(signals.getSourceFreshness().get(SourceType.HEALTH_ADVISORY))) {
+                isFreshOrStale(advisoryFreshness)) {
             reasons.add(ReasonCode.HEALTH_ADVISORY_ACTIVE);
             String advisoryDetails = signals.getHealthAdvisoryMessage();
             String summary = (advisoryDetails != null && !advisoryDetails.isBlank())
@@ -56,10 +54,7 @@ public class DecisionEngine {
         }
 
         // Priority 3: no fresh data at all (check before priority 2 cautions)
-        boolean hasAnyFreshData = signals.getSourceFreshness().values().stream()
-                .anyMatch(s -> s == FreshnessStatus.FRESH || s == FreshnessStatus.STALE);
-
-        if (!hasAnyFreshData || overallFreshness == FreshnessStatus.EXPIRED) {
+        if (!hasUsableSeaData) {
             reasons.add(ReasonCode.NO_FRESH_DATA);
             return buildDecision(signals, Recommendation.UNKNOWN, Confidence.LOW,
                     reasons, overallFreshness, missing,
@@ -89,11 +84,10 @@ public class DecisionEngine {
         }
 
         // Source conflict detection: health advisory present but stale, downgrade confidence
-        FreshnessStatus advisoryFreshness = signals.getSourceFreshness().get(SourceType.HEALTH_ADVISORY);
-        if (!missing.isEmpty() || advisoryFreshness == FreshnessStatus.STALE) {
+        if (!missing.isEmpty() || advisoryFreshness != FreshnessStatus.FRESH) {
             confidence = Confidence.MEDIUM;
         }
-        if (missing.size() >= 2) {
+        if (missing.size() >= 2 || advisoryFreshness == FreshnessStatus.EXPIRED) {
             confidence = Confidence.LOW;
         }
 
@@ -121,6 +115,23 @@ public class DecisionEngine {
 
     private boolean isFreshOrStale(FreshnessStatus status) {
         return status == FreshnessStatus.FRESH || status == FreshnessStatus.STALE;
+    }
+
+    private FreshnessStatus sourceFreshness(BeachSignals signals, SourceType sourceType) {
+        FreshnessStatus status = signals.getSourceFreshness().get(sourceType);
+        return status != null ? status : FreshnessStatus.EXPIRED;
+    }
+
+    private FreshnessStatus computeOverallFreshness(BeachSignals signals, FreshnessStatus seaFreshness) {
+        if (seaFreshness == FreshnessStatus.EXPIRED) {
+            return FreshnessStatus.EXPIRED;
+        }
+        if (seaFreshness == FreshnessStatus.STALE) {
+            return FreshnessStatus.STALE;
+        }
+        boolean hasDegradedSource = signals.getSourceFreshness().entrySet().stream()
+                .anyMatch(e -> e.getKey() != SourceType.SEA_FORECAST && e.getValue() != FreshnessStatus.FRESH);
+        return hasDegradedSource ? FreshnessStatus.STALE : FreshnessStatus.FRESH;
     }
 
     private String buildCautionSummary(List<ReasonCode> reasons) {

@@ -13,6 +13,7 @@ import com.beachassistant.web.dto.LifeguardHoursDto;
 import org.springframework.stereotype.Component;
 
 import java.time.ZonedDateTime;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -277,9 +278,23 @@ public class ResponseFormatter {
                 ? decision.getSourceCapturedAt().get(type)
                 : null;
         String timePart = cap != null
-                ? "запись от " + TimeUtil.formatForDisplay(cap)
+                ? "обновлено " + formatAge(cap) + " назад (" + TimeUtil.formatForDisplay(cap) + ")"
                 : "время записи неизвестно";
         return label + " — " + freshnessWord + ", " + timePart;
+    }
+
+    private String formatAge(ZonedDateTime capturedAt) {
+        Duration age = Duration.between(capturedAt, TimeUtil.nowInIsrael());
+        long minutes = Math.max(0, age.toMinutes());
+        if (minutes < 60) {
+            return minutes + " мин";
+        }
+        long hours = minutes / 60;
+        long remMinutes = minutes % 60;
+        if (remMinutes == 0) {
+            return hours + " ч";
+        }
+        return hours + " ч " + remMinutes + " мин";
     }
 
     private String formatNumber(Double value, String unit) {

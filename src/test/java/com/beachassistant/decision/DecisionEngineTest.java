@@ -1,9 +1,7 @@
 package com.beachassistant.decision;
 
 import com.beachassistant.common.enums.*;
-import com.beachassistant.config.FreshnessProperties;
 import com.beachassistant.decision.engine.DecisionEngine;
-import com.beachassistant.decision.freshness.FreshnessService;
 import com.beachassistant.domain.model.BeachDecision;
 import com.beachassistant.domain.model.BeachSignals;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,9 +19,7 @@ class DecisionEngineTest {
 
     @BeforeEach
     void setUp() {
-        FreshnessProperties props = new FreshnessProperties();
-        FreshnessService freshnessService = new FreshnessService(props);
-        engine = new DecisionEngine(freshnessService);
+        engine = new DecisionEngine();
     }
 
     @Test
@@ -137,6 +133,24 @@ class DecisionEngineTest {
 
         assertThat(decision.getRecommendation()).isEqualTo(Recommendation.UNKNOWN);
         assertThat(decision.getReasonCodes()).contains(ReasonCode.NO_FRESH_DATA);
+    }
+
+    @Test
+    void seaFreshButAdvisoryExpired_shouldStillReturnUsableRecommendation() {
+        Map<SourceType, FreshnessStatus> freshness = allFreshMap();
+        freshness.put(SourceType.HEALTH_ADVISORY, FreshnessStatus.EXPIRED);
+
+        BeachSignals signals = signalsBuilder()
+                .seaRiskLevel(SeaRiskLevel.CALM)
+                .lifeguardOnDuty(true)
+                .sourceFreshness(freshness)
+                .build();
+
+        BeachDecision decision = engine.evaluate(signals);
+
+        assertThat(decision.getRecommendation()).isEqualTo(Recommendation.CAN_SWIM);
+        assertThat(decision.getFreshnessStatus()).isEqualTo(FreshnessStatus.STALE);
+        assertThat(decision.getConfidence()).isEqualTo(Confidence.LOW);
     }
 
     @Test

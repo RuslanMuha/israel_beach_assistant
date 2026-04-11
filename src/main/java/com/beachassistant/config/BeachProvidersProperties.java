@@ -2,12 +2,16 @@ package com.beachassistant.config;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * External data providers (Open-Meteo, iNaturalist). Set {@code beach.providers.stub=true} for offline tests.
@@ -43,10 +47,37 @@ public class BeachProvidersProperties {
     private int httpTimeoutSeconds = 15;
 
     /**
+     * Optional shared provider coordinates for air-quality ingestion, keyed by location id.
+     */
+    private Map<String, ProviderLocation> advisoryProviderLocations = new HashMap<>();
+
+    /**
+     * Maps beach slug to provider location key from {@link #advisoryProviderLocations}.
+     */
+    private Map<String, String> advisoryProviderLocationByBeach = new HashMap<>();
+
+    /**
      * Max bytes buffered for a single HTTP response body (WebClient). iNaturalist JSON for
      * {@code per_page=50} often exceeds Spring's default 256 KiB limit.
      */
     @Min(65_536)
     @Max(104_857_600)
     private int httpMaxResponseBufferBytes = 5_242_880;
+
+    public Optional<ProviderLocation> advisoryProviderLocationForBeach(String beachSlug) {
+        String key = advisoryProviderLocationByBeach.get(beachSlug);
+        if (key == null || key.isBlank()) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(advisoryProviderLocations.get(key));
+    }
+
+    @Getter
+    @Setter
+    public static class ProviderLocation {
+        @NotNull
+        private Double latitude;
+        @NotNull
+        private Double longitude;
+    }
 }

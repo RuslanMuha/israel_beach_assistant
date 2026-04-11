@@ -46,6 +46,10 @@ management:
         enabled: true
 
 beach:
+  # Require header X-Admin-Token when non-empty (use BEACH_ADMIN_API_TOKEN in production).
+  admin:
+    api-token: ${BEACH_ADMIN_API_TOKEN:}
+
   telegram:
     mode: ${BEACH_TELEGRAM_MODE:polling}
     token: ${TELEGRAM_BOT_TOKEN:CONFIGURE_ME}
@@ -64,6 +68,14 @@ beach:
     air-quality-advisory-threshold: 50
     jellyfish-search-radius-km: 12
     http-timeout-seconds: 15
+    # Optional: map multiple beaches to one advisory provider location.
+    # advisory-provider-locations:
+    #   ashdod-west:
+    #     latitude: 31.81
+    #     longitude: 34.64
+    # advisory-provider-location-by-beach:
+    #   yud-alef-beach: ashdod-west
+    #   lido-beach: ashdod-west
     # WebClient body buffer (bytes); iNaturalist JSON may exceed default 256 KiB
     http-max-response-buffer-bytes: ${BEACH_HTTP_MAX_RESPONSE_BUFFER_BYTES:5242880}
 
@@ -119,8 +131,13 @@ beach:
     ingestion:
       batch-size: 25
       max-concurrent-beaches: 2
-      pacing-millis-between-beaches: 0
+      pacing-millis-between-beaches: 75
+      refresh-window-by-source:
+        SEA_FORECAST: 45m
+        HEALTH_ADVISORY: 90m
+        JELLYFISH: 2h
     scheduler:
+      # Single-flight is per JVM; multiple replicas can still overlap unless only one runs schedulers.
       skip-if-overlap: true
       initial-delay-ms: 90000
 
