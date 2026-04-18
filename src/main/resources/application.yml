@@ -58,7 +58,8 @@ beach:
     token: ${TELEGRAM_BOT_TOKEN:CONFIGURE_ME}
     username: ${TELEGRAM_BOT_USERNAME:israelBeach_bot}
     # Public HTTPS origin only (no path). Used to build setWebhook URL when mode=webhook.
-    public-base-url: ${TELEGRAM_PUBLIC_BASE_URL:${TELEGRAM_WEBHOOK_BASE_URL:}}
+    # Render injects RENDER_EXTERNAL_URL (https://<service>.onrender.com) when not set explicitly.
+    public-base-url: ${TELEGRAM_PUBLIC_BASE_URL:${TELEGRAM_WEBHOOK_BASE_URL:${RENDER_EXTERNAL_URL:}}}
     webhook-path: ${BEACH_TELEGRAM_WEBHOOK_PATH:/api/telegram/webhook}
     webhook-auto-register: ${BEACH_TELEGRAM_WEBHOOK_AUTO_REGISTER:true}
     webhook-secret-token: ${TELEGRAM_WEBHOOK_SECRET:}
@@ -74,7 +75,7 @@ beach:
     outbox:
       enabled: true
       batch-size: 10
-      poll-interval: 500ms
+      poll-interval-millis: 500
       max-attempts: 8
       initial-backoff: 2s
       max-backoff: 5m
