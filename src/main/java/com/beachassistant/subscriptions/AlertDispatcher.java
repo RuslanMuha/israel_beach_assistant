@@ -13,6 +13,7 @@ import com.beachassistant.persistence.repository.BeachDecisionHistoryRepository;
 import com.beachassistant.persistence.repository.BeachRepository;
 import com.beachassistant.persistence.repository.BeachSubscriptionRepository;
 import com.beachassistant.persistence.repository.TelegramUserRepository;
+import com.beachassistant.i18n.I18n;
 import com.beachassistant.telegram.outbox.TelegramSender;
 import jakarta.persistence.EntityManager;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +30,7 @@ import java.time.Clock;
 import java.time.ZonedDateTime;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -58,6 +60,7 @@ public class AlertDispatcher {
     private final TelegramSender telegramSender;
     private final EntityManager entityManager;
     private final Clock clock;
+    private final I18n i18n;
 
     public AlertDispatcher(BeachSubscriptionRepository subscriptions,
                            BeachRepository beaches,
@@ -67,7 +70,8 @@ public class AlertDispatcher {
                            BeachStatusUseCase statusUseCase,
                            TelegramSender telegramSender,
                            EntityManager entityManager,
-                           Clock clock) {
+                           Clock clock,
+                           I18n i18n) {
         this.subscriptions = subscriptions;
         this.beaches = beaches;
         this.history = history;
@@ -77,6 +81,7 @@ public class AlertDispatcher {
         this.telegramSender = telegramSender;
         this.entityManager = entityManager;
         this.clock = clock;
+        this.i18n = i18n;
     }
 
     @Scheduled(fixedDelay = 60_000L, initialDelay = 60_000L)
@@ -127,8 +132,9 @@ public class AlertDispatcher {
             }
             TelegramUserEntity user = users.findById(sub.getTelegramUserId()).orElse(null);
             if (user == null) continue;
-            String text = "🔔 Обновление по пляжу " + beach.getDisplayName()
-                    + ": " + decision.getRecommendation().name();
+            Locale locale = localeFor(user);
+            String recLabel = i18n.t(locale, "rec.name." + decision.getRecommendation().name());
+            String text = i18n.t(locale, "alert.update", beach.getDisplayName(), recLabel);
             String dedup = "alert:" + beach.getId() + ":" + signature + ":" + user.getId();
             telegramSender.sendTextDeduped(user.getChatId(), text, null, dedup);
 
@@ -139,6 +145,13 @@ public class AlertDispatcher {
             delivery.setSentAt(ZonedDateTime.now(clock));
             deliveries.save(delivery);
         }
+    }
+
+    private static Locale localeFor(TelegramUserEntity user) {
+        if (user.getLanguageCode() == null || user.getLanguageCode().isBlank()) {
+            return Locale.forLanguageTag("ru");
+        }
+        return Locale.forLanguageTag(user.getLanguageCode());
     }
 
     private static String reasonCodesText(BeachDecision decision) {

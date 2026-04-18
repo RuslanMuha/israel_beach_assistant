@@ -1,12 +1,31 @@
 package com.beachassistant.telegram.formatter;
 
+import com.beachassistant.i18n.I18n;
+import com.beachassistant.i18n.I18nTestConfig;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.i18n.LocaleContextHolder;
 
+import java.util.Locale;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class StatusCardTemplateTest {
+
+    private I18n i18n;
+
+    @BeforeEach
+    void setRuLocale() {
+        i18n = I18nTestConfig.ru();
+        LocaleContextHolder.setLocale(Locale.forLanguageTag("ru"));
+    }
+
+    @AfterEach
+    void resetLocale() {
+        LocaleContextHolder.resetLocaleContext();
+    }
 
     @Test
     void format_matchesCompactCardLayout() {
@@ -30,7 +49,7 @@ class StatusCardTemplateTest {
                 "20:31",
                 Optional.of("Данные: муниципалитет + meteo")
         );
-        String text = StatusCardTemplate.format(model);
+        String text = StatusCardTemplate.format(model, i18n);
         assertThat(text).isEqualTo("""
                 Lido (Ashdod)
                 ⚠️ Осторожно  🟢 свежо
@@ -78,7 +97,7 @@ class StatusCardTemplateTest {
                 "12:00",
                 Optional.empty()
         );
-        String text = StatusCardTemplate.format(model);
+        String text = StatusCardTemplate.format(model, i18n);
         assertThat(text).doesNotContain("Сейчас:");
         assertThat(text).doesNotContain("Условия:");
         assertThat(text).doesNotContain("Пляж:");

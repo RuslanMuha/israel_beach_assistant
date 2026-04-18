@@ -10,6 +10,7 @@ import com.beachassistant.persistence.repository.BeachRepository;
 import com.beachassistant.persistence.repository.BeachSubscriptionRepository;
 import com.beachassistant.persistence.repository.TelegramUserPreferenceRepository;
 import com.beachassistant.persistence.repository.TelegramUserRepository;
+import com.beachassistant.i18n.I18n;
 import com.beachassistant.telegram.outbox.TelegramSender;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -22,6 +23,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Sends an opt-in morning summary to subscribed users at their configured {@code digest_hour}.
@@ -44,6 +46,7 @@ public class DigestDispatcher {
     private final BeachStatusUseCase statusUseCase;
     private final TelegramSender telegramSender;
     private final Clock clock;
+    private final I18n i18n;
 
     public DigestDispatcher(TelegramUserRepository users,
                             TelegramUserPreferenceRepository preferences,
@@ -51,7 +54,8 @@ public class DigestDispatcher {
                             BeachRepository beaches,
                             BeachStatusUseCase statusUseCase,
                             TelegramSender telegramSender,
-                            Clock clock) {
+                            Clock clock,
+                            I18n i18n) {
         this.users = users;
         this.preferences = preferences;
         this.subscriptions = subscriptions;
@@ -59,6 +63,7 @@ public class DigestDispatcher {
         this.statusUseCase = statusUseCase;
         this.telegramSender = telegramSender;
         this.clock = clock;
+        this.i18n = i18n;
     }
 
     @Scheduled(cron = "0 0 * * * *", zone = "Asia/Jerusalem")
@@ -83,18 +88,27 @@ public class DigestDispatcher {
         List<BeachSubscriptionEntity> subs = subscriptions.findByTelegramUserId(userPkId);
         if (subs.isEmpty()) return;
 
+        Locale locale = localeFor(user);
         List<String> lines = new ArrayList<>();
-        lines.add("🌅 Утренняя сводка");
+        lines.add(i18n.t(locale, "digest.title"));
         for (BeachSubscriptionEntity sub : subs) {
             BeachEntity beach = beaches.findById(sub.getBeachId()).orElse(null);
             if (beach == null) continue;
             try {
                 BeachDecision decision = statusUseCase.getStatus(beach.getSlug());
-                lines.add("• " + beach.getDisplayName() + ": " + decision.getRecommendation().name());
+                lines.add("• " + beach.getDisplayName() + ": "
+                        + i18n.t(locale, "rec.name." + decision.getRecommendation().name()));
             } catch (Exception e) {
-                lines.add("• " + beach.getDisplayName() + ": нет данных");
+                lines.add("• " + beach.getDisplayName() + ": " + i18n.t(locale, "digest.no_data"));
             }
         }
         telegramSender.sendText(user.getChatId(), String.join("\n", lines));
+    }
+
+    private static Locale localeFor(TelegramUserEntity user) {
+        if (user.getLanguageCode() == null || user.getLanguageCode().isBlank()) {
+            return Locale.forLanguageTag("ru");
+        }
+        return Locale.forLanguageTag(user.getLanguageCode());
     }
 }

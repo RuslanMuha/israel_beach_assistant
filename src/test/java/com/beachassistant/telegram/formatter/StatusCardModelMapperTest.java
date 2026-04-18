@@ -8,18 +8,37 @@ import com.beachassistant.common.enums.SourceType;
 import com.beachassistant.domain.model.BeachDecision;
 import com.beachassistant.domain.model.BeachFacilities;
 import com.beachassistant.domain.model.BeachProfile;
+import com.beachassistant.i18n.I18n;
+import com.beachassistant.i18n.I18nTestConfig;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.i18n.LocaleContextHolder;
 
 import java.time.ZonedDateTime;
 import java.util.EnumMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class StatusCardModelMapperTest {
 
-    private final StatusCardModelMapper mapper = new StatusCardModelMapper();
+    private StatusCardModelMapper mapper;
+    private I18n i18n;
+
+    @BeforeEach
+    void setUp() {
+        i18n = I18nTestConfig.ru();
+        mapper = new StatusCardModelMapper(i18n);
+        LocaleContextHolder.setLocale(Locale.forLanguageTag("ru"));
+    }
+
+    @AfterEach
+    void tearDown() {
+        LocaleContextHolder.resetLocaleContext();
+    }
 
     @Test
     void windAbbrevRu_mapsEightPointCompass() {

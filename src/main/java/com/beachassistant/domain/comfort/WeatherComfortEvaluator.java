@@ -1,6 +1,7 @@
 package com.beachassistant.domain.comfort;
 
 import com.beachassistant.domain.model.BeachDecision;
+import com.beachassistant.i18n.I18n;
 import org.springframework.stereotype.Component;
 
 /**
@@ -8,6 +9,12 @@ import org.springframework.stereotype.Component;
  */
 @Component
 public class WeatherComfortEvaluator {
+
+    private final I18n i18n;
+
+    public WeatherComfortEvaluator(I18n i18n) {
+        this.i18n = i18n;
+    }
 
     public String comfortLabel(BeachDecision d) {
         int score = 0;
@@ -34,11 +41,11 @@ public class WeatherComfortEvaluator {
             score += 1;
         }
         if (score >= 4) {
-            return "некомфортно";
+            return i18n.t("comfort.uncomfortable");
         }
         if (score >= 2) {
-            return "условно комфортно";
+            return i18n.t("comfort.marginal");
         }
-        return "комфортно";
+        return i18n.t("comfort.comfortable");
     }
 }

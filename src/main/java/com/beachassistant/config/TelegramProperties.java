@@ -51,7 +51,7 @@ public class TelegramProperties {
     @Getter
     @Setter
     public static class Features {
-        /** Shows the "Подписаться" inline button and enables subscription commands. */
+        /** Shows the subscribe inline button and enables subscription commands. */
         private boolean subscriptionsEnabled = false;
     }
 }

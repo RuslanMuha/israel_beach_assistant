@@ -9,20 +9,24 @@ import com.beachassistant.app.usecase.LifeguardUseCase;
 import com.beachassistant.common.exception.BeachNotFoundException;
 import com.beachassistant.config.TelegramProperties;
 import com.beachassistant.i18n.I18n;
+import com.beachassistant.i18n.I18nTestConfig;
 import com.beachassistant.subscriptions.SubscriptionService;
 import com.beachassistant.persistence.entity.BotInteractionLogEntity;
 import com.beachassistant.persistence.repository.BotInteractionLogRepository;
 import com.beachassistant.telegram.formatter.ResponseFormatter;
 import com.beachassistant.telegram.outbox.TelegramSender;
 import com.beachassistant.telegram.ratelimit.TelegramRateLimiter;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.mockito.ArgumentCaptor;
 import org.telegram.telegrambots.meta.api.objects.Message;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.User;
 
 import java.util.List;
+import java.util.Locale;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -51,6 +55,7 @@ class BeachBotUpdateProcessorTest {
 
     @BeforeEach
     void setUp() {
+        LocaleContextHolder.setLocale(Locale.forLanguageTag("ru"));
         beachResolver = mock(BeachResolverUseCase.class);
         statusUseCase = mock(BeachStatusUseCase.class);
         cameraUseCase = mock(CameraUseCase.class);
@@ -63,7 +68,7 @@ class BeachBotUpdateProcessorTest {
         rateLimiter = mock(TelegramRateLimiter.class);
         singleFlight = new ChatSingleFlightGuard();
         telegramProperties = new TelegramProperties();
-        I18n i18n = new I18n(buildMessageSource());
+        I18n i18n = new I18n(I18nTestConfig.messageSource());
         SubscriptionService subscriptionService = mock(SubscriptionService.class);
         processor = new BeachBotUpdateProcessor(beachResolver, statusUseCase, cameraUseCase,
                 lifeguardUseCase, jellyfishUseCase, formatter, beachProfileParser,
@@ -72,21 +77,9 @@ class BeachBotUpdateProcessorTest {
         when(beachResolver.listAll()).thenReturn(List.of());
     }
 
-    private static org.springframework.context.MessageSource buildMessageSource() {
-        final java.util.Map<String, String> msgs = new java.util.HashMap<>();
-        msgs.put("error.generic", "Что-то пошло не так. Попробуйте снова через минуту. (код: {0})");
-        msgs.put("error.transient", "\u26A0 Внешний источник временно недоступен. (код: {0})");
-        msgs.put("error.user_facing_prefix", "\u26A0");
-        msgs.put("error.in_flight", "\u23F3 Уже обрабатываю предыдущий запрос.");
-        msgs.put("error.rate_limited", "\u23F3 Слишком много запросов.");
-        msgs.put("command.unknown", "Не понял запрос. Попробуй /status или /beaches.");
-        return new org.springframework.context.support.AbstractMessageSource() {
-            @Override
-            protected java.text.MessageFormat resolveCode(String code, java.util.Locale locale) {
-                String t = msgs.get(code);
-                return t == null ? null : new java.text.MessageFormat(t, locale);
-            }
-        };
+    @AfterEach
+    void resetLocale() {
+        LocaleContextHolder.resetLocaleContext();
     }
 
     private Update textUpdate(long chatId, long userId, String text) {

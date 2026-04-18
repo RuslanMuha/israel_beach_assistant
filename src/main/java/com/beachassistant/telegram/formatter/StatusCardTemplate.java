@@ -1,5 +1,7 @@
 package com.beachassistant.telegram.formatter;
 
+import com.beachassistant.i18n.I18n;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -12,7 +14,7 @@ public final class StatusCardTemplate {
     private StatusCardTemplate() {
     }
 
-    public static String format(StatusCardModel m) {
+    public static String format(StatusCardModel m, I18n i18n) {
         StringBuilder sb = new StringBuilder();
         sb.append(m.beachName()).append(" (").append(m.city()).append(")\n");
         sb.append(m.overallEmoji()).append(" ").append(m.overallLabel());
@@ -22,37 +24,37 @@ public final class StatusCardTemplate {
         sb.append("\n");
         sb.append(m.shortHumanRecommendation()).append("\n\n");
 
-        appendSection(sb, "Сейчас:", listNowBullets(m));
-        appendSection(sb, "Условия:", listConditionsBullets(m));
-        appendSection(sb, "Пляж:", listBeachBullets(m));
+        appendSection(sb, i18n.t("card.section.now"), listNowBullets(m, i18n));
+        appendSection(sb, i18n.t("card.section.conditions"), listConditionsBullets(m, i18n));
+        appendSection(sb, i18n.t("card.section.beach"), listBeachBullets(m, i18n));
 
-        sb.append("Обновлено: ").append(m.updatedAtLine()).append("\n");
+        sb.append(i18n.t("card.updated", m.updatedAtLine())).append("\n");
         m.sourceSummaryLine().ifPresent(line -> sb.append(line).append("\n"));
         return sb.toString().trim();
     }
 
-    private static List<String> listNowBullets(StatusCardModel m) {
+    private static List<String> listNowBullets(StatusCardModel m, I18n i18n) {
         List<String> bullets = new ArrayList<>();
-        addBullet(bullets, "Флаг", m.flagLabel());
-        addBullet(bullets, "Спасатели", m.lifeguardLine());
-        addBullet(bullets, "Волна", m.waveLine());
-        addBullet(bullets, "Вода", m.waterLine());
+        addBullet(bullets, i18n.t("card.bullet.flag"), m.flagLabel());
+        addBullet(bullets, i18n.t("card.bullet.lifeguards"), m.lifeguardLine());
+        addBullet(bullets, i18n.t("card.bullet.wave"), m.waveLine());
+        addBullet(bullets, i18n.t("card.bullet.water"), m.waterLine());
         return bullets;
     }
 
-    private static List<String> listConditionsBullets(StatusCardModel m) {
+    private static List<String> listConditionsBullets(StatusCardModel m, I18n i18n) {
         List<String> bullets = new ArrayList<>();
-        addBullet(bullets, "Воздух", m.airLine());
-        addBullet(bullets, "Ветер", m.windLine());
-        addBullet(bullets, "UV", m.uvLine());
+        addBullet(bullets, i18n.t("card.bullet.air"), m.airLine());
+        addBullet(bullets, i18n.t("card.bullet.wind"), m.windLine());
+        addBullet(bullets, i18n.t("card.bullet.uv"), m.uvLine());
         return bullets;
     }
 
-    private static List<String> listBeachBullets(StatusCardModel m) {
+    private static List<String> listBeachBullets(StatusCardModel m, I18n i18n) {
         List<String> bullets = new ArrayList<>();
-        addBullet(bullets, "Тип", m.beachTypesLine());
-        addBullet(bullets, "Удобства", m.facilitiesLine());
-        addBullet(bullets, "Камера", m.cameraLine());
+        addBullet(bullets, i18n.t("card.bullet.type"), m.beachTypesLine());
+        addBullet(bullets, i18n.t("card.bullet.facilities"), m.facilitiesLine());
+        addBullet(bullets, i18n.t("card.bullet.camera"), m.cameraLine());
         return bullets;
     }
 
