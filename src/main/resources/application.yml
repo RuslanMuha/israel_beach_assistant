@@ -50,6 +50,9 @@ beach:
   admin:
     api-token: ${BEACH_ADMIN_API_TOKEN:}
 
+  subscriptions:
+    enabled: ${BEACH_SUBSCRIPTIONS_ENABLED:false}
+
   telegram:
     mode: ${BEACH_TELEGRAM_MODE:polling}
     token: ${TELEGRAM_BOT_TOKEN:CONFIGURE_ME}
@@ -59,6 +62,24 @@ beach:
     webhook-path: ${BEACH_TELEGRAM_WEBHOOK_PATH:/api/telegram/webhook}
     webhook-auto-register: ${BEACH_TELEGRAM_WEBHOOK_AUTO_REGISTER:true}
     webhook-secret-token: ${TELEGRAM_WEBHOOK_SECRET:}
+    rate-limit:
+      enabled: true
+      requests-per-minute: 20
+      burst: 5
+      cooldown-reply-interval: 30s
+      max-tracked-chats: 10000
+      bucket-idle-ttl: 1h
+    features:
+      subscriptions-enabled: ${BEACH_TELEGRAM_SUBSCRIPTIONS_ENABLED:false}
+    outbox:
+      enabled: true
+      batch-size: 10
+      poll-interval: 500ms
+      max-attempts: 8
+      initial-backoff: 2s
+      max-backoff: 5m
+      retention-after-sent: 3d
+      retention-failed: 14d
 
   # Open-Meteo (marine, weather, CAMS air quality) + iNaturalist — no API keys.
   # Set stub: true for offline tests (see application-test.yml).

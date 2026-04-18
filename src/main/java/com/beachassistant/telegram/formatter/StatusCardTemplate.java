@@ -15,7 +15,11 @@ public final class StatusCardTemplate {
     public static String format(StatusCardModel m) {
         StringBuilder sb = new StringBuilder();
         sb.append(m.beachName()).append(" (").append(m.city()).append(")\n");
-        sb.append(m.overallEmoji()).append(" ").append(m.overallLabel()).append("\n");
+        sb.append(m.overallEmoji()).append(" ").append(m.overallLabel());
+        if (m.freshnessBadge() != null && !m.freshnessBadge().isBlank()) {
+            sb.append("  ").append(m.freshnessBadge());
+        }
+        sb.append("\n");
         sb.append(m.shortHumanRecommendation()).append("\n\n");
 
         appendSection(sb, "Сейчас:", listNowBullets(m));

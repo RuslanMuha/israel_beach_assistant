@@ -6,30 +6,43 @@ import com.beachassistant.app.usecase.BeachStatusUseCase;
 import com.beachassistant.app.usecase.CameraUseCase;
 import com.beachassistant.app.usecase.JellyfishUseCase;
 import com.beachassistant.app.usecase.LifeguardUseCase;
+import com.beachassistant.common.exception.BeachAssistantException;
 import com.beachassistant.common.exception.BeachNotFoundException;
 import com.beachassistant.common.exception.CameraUnavailableException;
+import com.beachassistant.common.exception.Transient;
+import com.beachassistant.common.exception.UserFacing;
+import com.beachassistant.common.util.ChatIdHasher;
+import com.beachassistant.common.util.MdcKeys;
+import com.beachassistant.config.TelegramProperties;
 import com.beachassistant.domain.model.BeachDecision;
 import com.beachassistant.domain.model.BeachProfile;
+import com.beachassistant.i18n.I18n;
+import com.beachassistant.subscriptions.SubscriptionService;
 import com.beachassistant.persistence.entity.BotInteractionLogEntity;
 import com.beachassistant.persistence.entity.CameraEndpointEntity;
 import com.beachassistant.persistence.repository.BotInteractionLogRepository;
-import com.beachassistant.telegram.client.TelegramBotSender;
 import com.beachassistant.telegram.formatter.ResponseFormatter;
 import com.beachassistant.telegram.keyboard.InlineKeyboards;
+import com.beachassistant.telegram.outbox.TelegramSender;
+import com.beachassistant.telegram.ratelimit.TelegramRateLimiter;
 import com.beachassistant.web.dto.JellyfishDto;
 import com.beachassistant.web.dto.LifeguardHoursDto;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.stereotype.Service;
-import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
+import org.telegram.telegrambots.meta.api.methods.ActionType;
 import org.telegram.telegrambots.meta.api.objects.Update;
+import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
-import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.UUID;
 
 /**
- * Telegram-agnostic update handling: routing, use case calls, and outbound messages via {@link TelegramBotSender}.
+ * Telegram-agnostic update handling: routing, use case calls, and outbound messages via
+ * {@link TelegramSender}. Rate-limited per chat and guarded by {@link ChatSingleFlightGuard} so
+ * duplicate taps do not produce duplicate cards.
  */
 @Slf4j
 @Service
@@ -43,7 +56,12 @@ public class BeachBotUpdateProcessor {
     private final ResponseFormatter formatter;
     private final BeachProfileParser beachProfileParser;
     private final BotInteractionLogRepository logRepository;
-    private final TelegramBotSender telegramBotSender;
+    private final TelegramSender telegramSender;
+    private final TelegramRateLimiter rateLimiter;
+    private final ChatSingleFlightGuard singleFlightGuard;
+    private final TelegramProperties telegramProperties;
+    private final I18n i18n;
+    private final SubscriptionService subscriptionService;
 
     public BeachBotUpdateProcessor(BeachResolverUseCase beachResolver,
                                    BeachStatusUseCase statusUseCase,
@@ -53,7 +71,12 @@ public class BeachBotUpdateProcessor {
                                    ResponseFormatter formatter,
                                    BeachProfileParser beachProfileParser,
                                    BotInteractionLogRepository logRepository,
-                                   TelegramBotSender telegramBotSender) {
+                                   TelegramSender telegramSender,
+                                   TelegramRateLimiter rateLimiter,
+                                   ChatSingleFlightGuard singleFlightGuard,
+                                   TelegramProperties telegramProperties,
+                                   I18n i18n,
+                                   SubscriptionService subscriptionService) {
         this.beachResolver = beachResolver;
         this.statusUseCase = statusUseCase;
         this.cameraUseCase = cameraUseCase;
@@ -62,7 +85,12 @@ public class BeachBotUpdateProcessor {
         this.formatter = formatter;
         this.beachProfileParser = beachProfileParser;
         this.logRepository = logRepository;
-        this.telegramBotSender = telegramBotSender;
+        this.telegramSender = telegramSender;
+        this.rateLimiter = rateLimiter;
+        this.singleFlightGuard = singleFlightGuard;
+        this.telegramProperties = telegramProperties;
+        this.i18n = i18n;
+        this.subscriptionService = subscriptionService;
     }
 
     public void processUpdate(Update update) {
@@ -70,14 +98,17 @@ public class BeachBotUpdateProcessor {
         String text = null;
         Long userId = null;
         long chatId = 0;
+        User fromUser = null;
 
         if (update.hasCallbackQuery()) {
             text = update.getCallbackQuery().getData();
-            userId = update.getCallbackQuery().getFrom().getId();
+            fromUser = update.getCallbackQuery().getFrom();
+            userId = fromUser.getId();
             chatId = update.getCallbackQuery().getMessage().getChatId();
         } else if (update.hasMessage() && update.getMessage().hasText()) {
             text = update.getMessage().getText().trim();
-            userId = update.getMessage().getFrom().getId();
+            fromUser = update.getMessage().getFrom();
+            userId = fromUser.getId();
             chatId = update.getMessage().getChatId();
         }
 
@@ -85,19 +116,89 @@ public class BeachBotUpdateProcessor {
             return;
         }
 
-        String responseStatus = "OK";
-        try {
-            handleText(chatId, text);
-        } catch (Exception e) {
-            responseStatus = "ERROR";
-            log.error("Error handling update: {}", e.getMessage(), e);
-            sendText(chatId, "Произошла ошибка. Попробуйте позже.");
+        String requestId = UUID.randomUUID().toString().substring(0, 8);
+        MDC.put(MdcKeys.REQUEST_ID, requestId);
+        if (userId != null) {
+            MDC.put(MdcKeys.TELEGRAM_USER_ID, ChatIdHasher.hash(userId));
         }
+        try {
+            setLocaleFromTelegramUser(update);
 
-        logInteraction(userId, text, chatId, responseStatus, System.currentTimeMillis() - start);
+            TelegramRateLimiter.Decision rateDecision = rateLimiter.tryAcquire(chatId);
+            if (!rateDecision.allowed()) {
+                if (rateDecision.shouldSendCooldownReply()) {
+                    sendText(chatId, i18n.t("error.rate_limited"));
+                }
+                logInteraction(userId, text, chatId, "RATE_LIMITED", System.currentTimeMillis() - start);
+                return;
+            }
+
+            if (!singleFlightGuard.tryBegin(chatId)) {
+                sendText(chatId, i18n.t("error.in_flight"));
+                logInteraction(userId, text, chatId, "IN_FLIGHT", System.currentTimeMillis() - start);
+                return;
+            }
+
+            String responseStatus = "OK";
+            try {
+                handleText(chatId, text, fromUser);
+            } catch (BeachAssistantException domain) {
+                responseStatus = classify(domain);
+                sendText(chatId, renderDomainError(domain, requestId));
+                log.warn("Domain error handling update chat={} code={} msg={}",
+                        ChatIdHasher.hash(chatId), domain.getErrorCode(), domain.getMessage());
+            } catch (Exception e) {
+                responseStatus = "ERROR";
+                log.error("Unhandled error handling update chat={}", ChatIdHasher.hash(chatId), e);
+                sendText(chatId, i18n.t("error.generic", requestId));
+            } finally {
+                singleFlightGuard.end(chatId);
+            }
+
+            logInteraction(userId, text, chatId, responseStatus, System.currentTimeMillis() - start);
+        } finally {
+            MDC.remove(MdcKeys.REQUEST_ID);
+            MDC.remove(MdcKeys.TELEGRAM_USER_ID);
+        }
     }
 
-    private void handleText(long chatId, String text) {
+    /** Derives interaction outcome tag from the exception marker interfaces. */
+    private static String classify(BeachAssistantException e) {
+        if (e instanceof Transient) {
+            return "TRANSIENT";
+        }
+        if (e instanceof UserFacing) {
+            return "USER_FACING";
+        }
+        return "ERROR";
+    }
+
+    private String renderDomainError(BeachAssistantException e, String requestId) {
+        if (e instanceof Transient) {
+            return i18n.t("error.transient", requestId);
+        }
+        if (e instanceof UserFacing) {
+            return i18n.t("error.user_facing_prefix") + " " + e.getMessage();
+        }
+        return i18n.t("error.generic", requestId);
+    }
+
+    private void setLocaleFromTelegramUser(Update update) {
+        User user = update.hasMessage() && update.getMessage().getFrom() != null
+                ? update.getMessage().getFrom()
+                : (update.hasCallbackQuery() ? update.getCallbackQuery().getFrom() : null);
+        if (user == null || user.getLanguageCode() == null || user.getLanguageCode().isBlank()) {
+            return;
+        }
+        try {
+            org.springframework.context.i18n.LocaleContextHolder.setLocale(
+                    java.util.Locale.forLanguageTag(user.getLanguageCode()));
+        } catch (Exception ignored) {
+            // non-critical
+        }
+    }
+
+    private void handleText(long chatId, String text, User fromUser) {
         if ("CITY_SELECT".equals(text)) {
             showCitySelection(chatId);
             return;
@@ -200,6 +301,25 @@ public class BeachBotUpdateProcessor {
             return;
         }
 
+        if (telegramProperties.getFeatures().isSubscriptionsEnabled()) {
+            if ("/subscribe".equals(command)) {
+                handleSubscribe(chatId, fromUser, arg);
+                return;
+            }
+            if ("/unsubscribe".equals(command)) {
+                handleUnsubscribe(chatId, fromUser, arg);
+                return;
+            }
+            if ("/mysubs".equals(command)) {
+                handleMySubs(chatId, fromUser);
+                return;
+            }
+            if ("/digest".equals(command)) {
+                handleDigest(chatId, fromUser, arg);
+                return;
+            }
+        }
+
         if (!text.startsWith("/")) {
             try {
                 String possibleBeach = text.toLowerCase();
@@ -211,52 +331,36 @@ public class BeachBotUpdateProcessor {
             }
         }
 
-        sendText(chatId, "Не понял запрос. Попробуй /status <пляж> или /beaches для списка пляжей.");
+        sendText(chatId, i18n.t("command.unknown"));
     }
 
     private void handleStatus(long chatId, String beach) {
         try {
+            telegramSender.sendChatAction(chatId, ActionType.TYPING);
             BeachDecision decision = statusUseCase.getStatus(beach);
             var resolvedBeach = beachResolver.resolve(decision.getBeachSlug());
             boolean hasCamera = resolvedBeach.isHasCamera();
             BeachProfile profile = beachProfileParser.parse(resolvedBeach);
             String message = formatter.formatStatus(decision, profile, hasCamera);
-            SendMessage msg = SendMessage.builder()
-                    .chatId(chatId)
-                    .text(message)
-                    .replyMarkup(InlineKeyboards.beachActionButtons(
-                            decision.getBeachSlug(),
-                            resolvedBeach.getCity().getName(),
-                            hasCamera))
-                    .build();
-            telegramBotSender.execute(msg);
+            telegramSender.sendText(chatId, message, actionButtons(resolvedBeach.getSlug(),
+                    resolvedBeach.getCity().getName(), hasCamera));
         } catch (BeachNotFoundException e) {
             sendText(chatId, "Пляж «" + beach + "» не найден. Используй /beaches для списка.");
-        } catch (TelegramApiException e) {
-            log.error("Telegram API error: {}", e.getMessage(), e);
         }
     }
 
     private void handleDetails(long chatId, String beach) {
         try {
+            telegramSender.sendChatAction(chatId, ActionType.TYPING);
             BeachDecision decision = statusUseCase.getStatus(beach);
             var resolvedBeach = beachResolver.resolve(decision.getBeachSlug());
             boolean hasCamera = resolvedBeach.isHasCamera();
             BeachProfile profile = beachProfileParser.parse(resolvedBeach);
             String message = formatter.formatStatusDetails(decision, profile);
-            SendMessage msg = SendMessage.builder()
-                    .chatId(chatId)
-                    .text(message)
-                    .replyMarkup(InlineKeyboards.beachActionButtons(
-                            decision.getBeachSlug(),
-                            resolvedBeach.getCity().getName(),
-                            hasCamera))
-                    .build();
-            telegramBotSender.execute(msg);
+            telegramSender.sendText(chatId, message, actionButtons(resolvedBeach.getSlug(),
+                    resolvedBeach.getCity().getName(), hasCamera));
         } catch (BeachNotFoundException e) {
             sendText(chatId, "Пляж «" + beach + "» не найден. Используй /beaches для списка.");
-        } catch (TelegramApiException e) {
-            log.error("Telegram API error: {}", e.getMessage(), e);
         }
     }
 
@@ -275,10 +379,7 @@ public class BeachBotUpdateProcessor {
             var beachEntity = beachResolver.resolve(beach);
             sendTextWithKeyboard(chatId,
                     formatter.formatCameraLive(beach, camera.getLiveUrl(), camera.getHealthStatus()),
-                    InlineKeyboards.beachActionButtons(
-                            beachEntity.getSlug(),
-                            beachEntity.getCity().getName(),
-                            true));
+                    actionButtons(beachEntity.getSlug(), beachEntity.getCity().getName(), true));
         } catch (CameraUnavailableException e) {
             sendText(chatId, formatter.formatCameraUnavailable(beach));
         } catch (BeachNotFoundException e) {
@@ -290,7 +391,13 @@ public class BeachBotUpdateProcessor {
         try {
             var snapshot = cameraUseCase.getLatestSnapshot(beach);
             if (snapshot.isPresent() && snapshot.get().getStorageUrl() != null) {
-                sendText(chatId, "📷 Снимок с камеры: " + snapshot.get().getStorageUrl());
+                var beachEntity = beachResolver.resolve(beach);
+                InlineKeyboardMarkup buttons = actionButtons(
+                        beachEntity.getSlug(), beachEntity.getCity().getName(), true);
+                telegramSender.sendPhoto(chatId,
+                        snapshot.get().getStorageUrl(),
+                        "📷 " + beachEntity.getDisplayName(),
+                        buttons);
             } else {
                 CameraEndpointEntity camera = cameraUseCase.getActiveCamera(beach);
                 if ("UNREACHABLE".equalsIgnoreCase(camera.getHealthStatus())) {
@@ -306,10 +413,7 @@ public class BeachBotUpdateProcessor {
                 sendTextWithKeyboard(chatId,
                         "Снимок сейчас недоступен, открываю live-ссылку:\n\n"
                                 + formatter.formatCameraLive(beach, camera.getLiveUrl(), camera.getHealthStatus()),
-                        InlineKeyboards.beachActionButtons(
-                                beachEntity.getSlug(),
-                                beachEntity.getCity().getName(),
-                                true));
+                        actionButtons(beachEntity.getSlug(), beachEntity.getCity().getName(), true));
             }
         } catch (CameraUnavailableException e) {
             sendText(chatId, formatter.formatCameraUnavailable(beach));
@@ -318,27 +422,79 @@ public class BeachBotUpdateProcessor {
         }
     }
 
-    private void sendText(long chatId, String text) {
+    private void handleSubscribe(long chatId, User fromUser, String arg) {
+        if (fromUser == null) {
+            return;
+        }
+        if (arg == null || arg.isBlank()) {
+            sendText(chatId, "Использование: /subscribe <slug>");
+            return;
+        }
         try {
-            telegramBotSender.execute(SendMessage.builder()
-                    .chatId(chatId)
-                    .text(text)
-                    .build());
-        } catch (TelegramApiException e) {
-            log.error("Failed to send message: {}", e.getMessage(), e);
+            String lang = fromUser.getLanguageCode();
+            SubscriptionService.Result result = subscriptionService.subscribe(
+                    fromUser.getId(), chatId, lang, arg.trim().toLowerCase());
+            if (result.created()) {
+                sendText(chatId, "✅ Подписка оформлена: " + result.beach().getDisplayName());
+            } else {
+                sendText(chatId, "ℹ️ Вы уже подписаны на " + result.beach().getDisplayName());
+            }
+        } catch (BeachNotFoundException e) {
+            sendText(chatId, "Пляж «" + arg + "» не найден.");
         }
     }
 
-    private void sendTextWithKeyboard(long chatId, String text, InlineKeyboardMarkup keyboard) {
-        try {
-            telegramBotSender.execute(SendMessage.builder()
-                    .chatId(chatId)
-                    .text(text)
-                    .replyMarkup(keyboard)
-                    .build());
-        } catch (TelegramApiException e) {
-            log.error("Failed to send message with keyboard: {}", e.getMessage(), e);
+    private void handleUnsubscribe(long chatId, User fromUser, String arg) {
+        if (fromUser == null) {
+            return;
         }
+        if (arg == null || arg.isBlank()) {
+            sendText(chatId, "Использование: /unsubscribe <slug>");
+            return;
+        }
+        boolean removed = subscriptionService.unsubscribe(fromUser.getId(), arg.trim().toLowerCase());
+        sendText(chatId, removed ? "🗑️ Подписка удалена." : "Подписка не найдена.");
+    }
+
+    private void handleMySubs(long chatId, User fromUser) {
+        if (fromUser == null) {
+            return;
+        }
+        var subs = subscriptionService.subscriptionsFor(fromUser.getId());
+        if (subs.isEmpty()) {
+            sendText(chatId, "У вас пока нет подписок. Оформите через /subscribe <slug>.");
+            return;
+        }
+        StringBuilder sb = new StringBuilder("Ваши подписки:\n");
+        subs.forEach(s -> sb.append("• ID пляжа ").append(s.getBeachId()).append('\n'));
+        sendText(chatId, sb.toString());
+    }
+
+    private void handleDigest(long chatId, User fromUser, String arg) {
+        if (fromUser == null) {
+            return;
+        }
+        boolean on = arg != null && (arg.equalsIgnoreCase("on") || arg.equalsIgnoreCase("вкл"));
+        boolean off = arg != null && (arg.equalsIgnoreCase("off") || arg.equalsIgnoreCase("выкл"));
+        if (!on && !off) {
+            sendText(chatId, "Использование: /digest on | off");
+            return;
+        }
+        subscriptionService.setDigestEnabled(fromUser.getId(), chatId, fromUser.getLanguageCode(), on);
+        sendText(chatId, on ? "🌅 Утренний дайджест включён." : "Утренний дайджест выключен.");
+    }
+
+    private InlineKeyboardMarkup actionButtons(String slug, String cityName, boolean hasCamera) {
+        boolean subscriptionsEnabled = telegramProperties.getFeatures().isSubscriptionsEnabled();
+        return InlineKeyboards.beachActionButtons(slug, cityName, hasCamera, subscriptionsEnabled);
+    }
+
+    private void sendText(long chatId, String text) {
+        telegramSender.sendText(chatId, text);
+    }
+
+    private void sendTextWithKeyboard(long chatId, String text, InlineKeyboardMarkup keyboard) {
+        telegramSender.sendText(chatId, text, keyboard);
     }
 
     private void showBeachActions(long chatId, String slug) {

@@ -13,6 +13,14 @@ public final class InlineKeyboards {
     }
 
     public static InlineKeyboardMarkup beachActionButtons(String slug, String cityName, boolean hasCamera) {
+        return beachActionButtons(slug, cityName, hasCamera, false);
+    }
+
+    /**
+     * @param subscriptionsEnabled when {@code true}, exposes the "Подписаться" action so users can subscribe to alerts.
+     */
+    public static InlineKeyboardMarkup beachActionButtons(String slug, String cityName, boolean hasCamera,
+                                                          boolean subscriptionsEnabled) {
         InlineKeyboardMarkup.InlineKeyboardMarkupBuilder builder = InlineKeyboardMarkup.builder()
                 .keyboardRow(List.of(
                         button("🔄 Обновить", "/status " + slug),
@@ -24,6 +32,10 @@ public final class InlineKeyboards {
             builder.keyboardRow(List.of(
                     button("🔴 Live", "/live " + slug),
                     button("📷 Камера", "/cam " + slug)));
+        }
+        if (subscriptionsEnabled) {
+            builder.keyboardRow(List.of(
+                    button("🔔 Подписаться", "/subscribe " + slug)));
         }
         builder.keyboardRow(List.of(
                 button("🏖 Сменить пляж", "CITY_BEACHES:" + cityName),

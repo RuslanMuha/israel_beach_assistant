@@ -6,6 +6,7 @@ import com.beachassistant.persistence.entity.BeachEntity;
 import com.beachassistant.persistence.repository.BeachRepository;
 import com.beachassistant.source.contract.FetchResult;
 import com.beachassistant.source.contract.SourceAdapter;
+import com.beachassistant.source.contract.SourceDescriptor;
 import com.beachassistant.source.contract.SourceRequest;
 import com.beachassistant.source.openmeteo.OpenMeteoClient;
 import com.beachassistant.source.openmeteo.OpenMeteoHourlyTime;
@@ -19,8 +20,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Environmental health signal from CAMS European AQI via <a href="https://open-meteo.com">Open-Meteo</a>
+ * Air-quality advisory from CAMS European AQI via <a href="https://open-meteo.com">Open-Meteo</a>
  * (near-shore air quality; not a substitute for Ministry of Health bathing-water lab tests).
+ *
+ * <p>Formerly named "HealthAdvisory" before the water-quality advisory split; the class name
+ * is kept for binary compatibility with persisted records and prior versions, but the
+ * descriptor id ({@code air-quality-advisory}) is the canonical identifier going forward.</p>
  */
 @Slf4j
 @Component
@@ -43,6 +48,17 @@ public class HealthAdvisoryAdapter implements SourceAdapter<HealthAdvisoryRecord
     @Override
     public SourceType sourceType() {
         return SourceType.HEALTH_ADVISORY;
+    }
+
+    @Override
+    public SourceDescriptor descriptor() {
+        return new SourceDescriptor(
+                "air-quality-advisory",
+                sourceType(),
+                "Open-Meteo CAMS air-quality advisory",
+                java.time.Duration.ofHours(1),
+                "HEALTH_ADVISORY"
+        );
     }
 
     @Override
