@@ -17,8 +17,11 @@ public class TelegramOutboxProperties {
     /** Max rows the dispatcher claims per tick. */
     private int batchSize = 10;
 
-    /** Polling delay between dispatcher ticks. */
-    private Duration pollInterval = Duration.ofMillis(500);
+    /**
+     * Milliseconds between dispatcher ticks. Used by {@code @Scheduled}; must be a plain number
+     * (not {@code 500ms}) so {@code fixedDelayString} can parse it.
+     */
+    private long pollIntervalMillis = 500;
 
     /** Attempts before a message is marked FAILED. */
     private int maxAttempts = 8;

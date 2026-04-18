@@ -51,7 +51,7 @@ public class TelegramOutboxDispatcher {
         this.txTemplate = txTemplate;
     }
 
-    @Scheduled(fixedDelayString = "${beach.telegram.outbox.poll-interval:500ms}")
+    @Scheduled(fixedDelayString = "${beach.telegram.outbox.poll-interval-millis:500}")
     public void tick() {
         if (!properties.isEnabled()) {
             return;
