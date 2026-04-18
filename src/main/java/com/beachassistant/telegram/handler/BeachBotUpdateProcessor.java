@@ -236,7 +236,7 @@ public class BeachBotUpdateProcessor {
         if ("/status".equals(command)) {
             if (arg == null || arg.isBlank()) {
                 sendTextWithKeyboard(chatId,
-                        "Сначала выбери пляж, затем нажми Обновить.",
+                        i18n.t("bot.hint.status"),
                         InlineKeyboards.beachSelectionButtons(beachResolver.listAll()));
                 return;
             }
@@ -247,7 +247,7 @@ public class BeachBotUpdateProcessor {
         if ("/details".equals(command)) {
             if (arg == null || arg.isBlank()) {
                 sendTextWithKeyboard(chatId,
-                        "Сначала выбери пляж, затем нажми Подробнее.",
+                        i18n.t("bot.hint.details"),
                         InlineKeyboards.beachSelectionButtons(beachResolver.listAll()));
                 return;
             }
@@ -258,7 +258,7 @@ public class BeachBotUpdateProcessor {
         if ("/hours".equals(command)) {
             if (arg == null || arg.isBlank()) {
                 sendTextWithKeyboard(chatId,
-                        "Сначала выбери пляж, затем нажми Часы.",
+                        i18n.t("bot.hint.hours"),
                         InlineKeyboards.beachSelectionButtons(beachResolver.listAll()));
                 return;
             }
@@ -270,7 +270,7 @@ public class BeachBotUpdateProcessor {
         if ("/jellyfish".equals(command)) {
             if (arg == null || arg.isBlank()) {
                 sendTextWithKeyboard(chatId,
-                        "Сначала выбери пляж, затем нажми Медузы.",
+                        i18n.t("bot.hint.jellyfish"),
                         InlineKeyboards.beachSelectionButtons(beachResolver.listAll()));
                 return;
             }
@@ -282,7 +282,7 @@ public class BeachBotUpdateProcessor {
         if ("/live".equals(command)) {
             if (arg == null || arg.isBlank()) {
                 sendTextWithKeyboard(chatId,
-                        "Сначала выбери пляж, затем нажми Live.",
+                        i18n.t("bot.hint.live"),
                         InlineKeyboards.beachSelectionButtons(beachResolver.listAll()));
                 return;
             }
@@ -293,7 +293,7 @@ public class BeachBotUpdateProcessor {
         if ("/cam".equals(command)) {
             if (arg == null || arg.isBlank()) {
                 sendTextWithKeyboard(chatId,
-                        "Сначала выбери пляж, затем нажми Камера.",
+                        i18n.t("bot.hint.cam"),
                         InlineKeyboards.beachSelectionButtons(beachResolver.listAll()));
                 return;
             }
@@ -345,7 +345,7 @@ public class BeachBotUpdateProcessor {
             telegramSender.sendText(chatId, message, actionButtons(resolvedBeach.getSlug(),
                     resolvedBeach.getCity().getName(), hasCamera));
         } catch (BeachNotFoundException e) {
-            sendText(chatId, "Пляж «" + beach + "» не найден. Используй /beaches для списка.");
+            sendText(chatId, i18n.t("beach.not_found_with_list", beach));
         }
     }
 
@@ -360,7 +360,7 @@ public class BeachBotUpdateProcessor {
             telegramSender.sendText(chatId, message, actionButtons(resolvedBeach.getSlug(),
                     resolvedBeach.getCity().getName(), hasCamera));
         } catch (BeachNotFoundException e) {
-            sendText(chatId, "Пляж «" + beach + "» не найден. Используй /beaches для списка.");
+            sendText(chatId, i18n.t("beach.not_found_with_list", beach));
         }
     }
 
@@ -371,7 +371,7 @@ public class BeachBotUpdateProcessor {
                 var beachEntity = beachResolver.resolve(beach);
                 sendTextWithKeyboard(chatId,
                         formatter.formatCameraTemporarilyUnavailable(beach),
-                        InlineKeyboards.cameraRetryButtons(
+                        InlineKeyboards.cameraRetryButtons(i18n,
                                 beachEntity.getSlug(),
                                 beachEntity.getCity().getName()));
                 return;
@@ -383,7 +383,7 @@ public class BeachBotUpdateProcessor {
         } catch (CameraUnavailableException e) {
             sendText(chatId, formatter.formatCameraUnavailable(beach));
         } catch (BeachNotFoundException e) {
-            sendText(chatId, "Пляж «" + beach + "» не найден.");
+            sendText(chatId, i18n.t("beach.not_found", beach));
         }
     }
 
@@ -404,21 +404,21 @@ public class BeachBotUpdateProcessor {
                     var beachEntity = beachResolver.resolve(beach);
                     sendTextWithKeyboard(chatId,
                             formatter.formatCameraTemporarilyUnavailable(beach),
-                            InlineKeyboards.cameraRetryButtons(
+                            InlineKeyboards.cameraRetryButtons(i18n,
                                     beachEntity.getSlug(),
                                     beachEntity.getCity().getName()));
                     return;
                 }
                 var beachEntity = beachResolver.resolve(beach);
                 sendTextWithKeyboard(chatId,
-                        "Снимок сейчас недоступен, открываю live-ссылку:\n\n"
-                                + formatter.formatCameraLive(beach, camera.getLiveUrl(), camera.getHealthStatus()),
+                        i18n.t("cam.fallback_to_live",
+                                formatter.formatCameraLive(beach, camera.getLiveUrl(), camera.getHealthStatus())),
                         actionButtons(beachEntity.getSlug(), beachEntity.getCity().getName(), true));
             }
         } catch (CameraUnavailableException e) {
             sendText(chatId, formatter.formatCameraUnavailable(beach));
         } catch (BeachNotFoundException e) {
-            sendText(chatId, "Пляж «" + beach + "» не найден.");
+            sendText(chatId, i18n.t("beach.not_found", beach));
         }
     }
 
@@ -427,7 +427,7 @@ public class BeachBotUpdateProcessor {
             return;
         }
         if (arg == null || arg.isBlank()) {
-            sendText(chatId, "Использование: /subscribe <slug>");
+            sendText(chatId, i18n.t("subscribe.usage"));
             return;
         }
         try {
@@ -435,12 +435,12 @@ public class BeachBotUpdateProcessor {
             SubscriptionService.Result result = subscriptionService.subscribe(
                     fromUser.getId(), chatId, lang, arg.trim().toLowerCase());
             if (result.created()) {
-                sendText(chatId, "✅ Подписка оформлена: " + result.beach().getDisplayName());
+                sendText(chatId, i18n.t("subscribe.created", result.beach().getDisplayName()));
             } else {
-                sendText(chatId, "ℹ️ Вы уже подписаны на " + result.beach().getDisplayName());
+                sendText(chatId, i18n.t("subscribe.already", result.beach().getDisplayName()));
             }
         } catch (BeachNotFoundException e) {
-            sendText(chatId, "Пляж «" + arg + "» не найден.");
+            sendText(chatId, i18n.t("beach.not_found", arg));
         }
     }
 
@@ -449,11 +449,11 @@ public class BeachBotUpdateProcessor {
             return;
         }
         if (arg == null || arg.isBlank()) {
-            sendText(chatId, "Использование: /unsubscribe <slug>");
+            sendText(chatId, i18n.t("unsubscribe.usage"));
             return;
         }
         boolean removed = subscriptionService.unsubscribe(fromUser.getId(), arg.trim().toLowerCase());
-        sendText(chatId, removed ? "🗑️ Подписка удалена." : "Подписка не найдена.");
+        sendText(chatId, removed ? i18n.t("unsubscribe.removed") : i18n.t("unsubscribe.not_found"));
     }
 
     private void handleMySubs(long chatId, User fromUser) {
@@ -462,11 +462,11 @@ public class BeachBotUpdateProcessor {
         }
         var subs = subscriptionService.subscriptionsFor(fromUser.getId());
         if (subs.isEmpty()) {
-            sendText(chatId, "У вас пока нет подписок. Оформите через /subscribe <slug>.");
+            sendText(chatId, i18n.t("mysubs.empty"));
             return;
         }
-        StringBuilder sb = new StringBuilder("Ваши подписки:\n");
-        subs.forEach(s -> sb.append("• ID пляжа ").append(s.getBeachId()).append('\n'));
+        StringBuilder sb = new StringBuilder(i18n.t("mysubs.header")).append('\n');
+        subs.forEach(s -> sb.append(i18n.t("mysubs.line", s.getBeachId())).append('\n'));
         sendText(chatId, sb.toString());
     }
 
@@ -477,16 +477,16 @@ public class BeachBotUpdateProcessor {
         boolean on = arg != null && (arg.equalsIgnoreCase("on") || arg.equalsIgnoreCase("вкл"));
         boolean off = arg != null && (arg.equalsIgnoreCase("off") || arg.equalsIgnoreCase("выкл"));
         if (!on && !off) {
-            sendText(chatId, "Использование: /digest on | off");
+            sendText(chatId, i18n.t("digest.usage"));
             return;
         }
         subscriptionService.setDigestEnabled(fromUser.getId(), chatId, fromUser.getLanguageCode(), on);
-        sendText(chatId, on ? "🌅 Утренний дайджест включён." : "Утренний дайджест выключен.");
+        sendText(chatId, on ? i18n.t("digest.enabled") : i18n.t("digest.disabled"));
     }
 
     private InlineKeyboardMarkup actionButtons(String slug, String cityName, boolean hasCamera) {
         boolean subscriptionsEnabled = telegramProperties.getFeatures().isSubscriptionsEnabled();
-        return InlineKeyboards.beachActionButtons(slug, cityName, hasCamera, subscriptionsEnabled);
+        return InlineKeyboards.beachActionButtons(i18n, slug, cityName, hasCamera, subscriptionsEnabled);
     }
 
     private void sendText(long chatId, String text) {
@@ -507,7 +507,7 @@ public class BeachBotUpdateProcessor {
                 .distinct()
                 .sorted(String::compareToIgnoreCase)
                 .toList();
-        sendTextWithKeyboard(chatId, "Выберите город 👇", InlineKeyboards.citySelectionButtons(cities));
+        sendTextWithKeyboard(chatId, i18n.t("city.pick"), InlineKeyboards.citySelectionButtons(cities));
     }
 
     private void showBeachesForCity(long chatId, String cityName) {
@@ -519,7 +519,7 @@ public class BeachBotUpdateProcessor {
             return;
         }
         sendTextWithKeyboard(chatId,
-                "Город: " + cityName + "\nВыберите пляж 👇",
+                i18n.t("city.pick_beach", cityName),
                 InlineKeyboards.beachSelectionButtons(beaches));
     }
 

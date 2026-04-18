@@ -1,5 +1,6 @@
 package com.beachassistant.telegram.keyboard;
 
+import com.beachassistant.i18n.I18n;
 import com.beachassistant.persistence.entity.BeachEntity;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
@@ -12,34 +13,34 @@ public final class InlineKeyboards {
     private InlineKeyboards() {
     }
 
-    public static InlineKeyboardMarkup beachActionButtons(String slug, String cityName, boolean hasCamera) {
-        return beachActionButtons(slug, cityName, hasCamera, false);
+    public static InlineKeyboardMarkup beachActionButtons(I18n i18n, String slug, String cityName, boolean hasCamera) {
+        return beachActionButtons(i18n, slug, cityName, hasCamera, false);
     }
 
     /**
-     * @param subscriptionsEnabled when {@code true}, exposes the "Подписаться" action so users can subscribe to alerts.
+     * @param subscriptionsEnabled when {@code true}, exposes the subscribe action so users can subscribe to alerts.
      */
-    public static InlineKeyboardMarkup beachActionButtons(String slug, String cityName, boolean hasCamera,
+    public static InlineKeyboardMarkup beachActionButtons(I18n i18n, String slug, String cityName, boolean hasCamera,
                                                           boolean subscriptionsEnabled) {
         InlineKeyboardMarkup.InlineKeyboardMarkupBuilder builder = InlineKeyboardMarkup.builder()
                 .keyboardRow(List.of(
-                        button("🔄 Обновить", "/status " + slug),
-                        button("📋 Подробнее", "/details " + slug)))
+                        button(i18n.t("keyboard.refresh"), "/status " + slug),
+                        button(i18n.t("keyboard.details"), "/details " + slug)))
                 .keyboardRow(List.of(
-                        button("🏊 Часы", "/hours " + slug),
-                        button("🪼 Медузы", "/jellyfish " + slug)));
+                        button(i18n.t("keyboard.hours"), "/hours " + slug),
+                        button(i18n.t("keyboard.jellyfish"), "/jellyfish " + slug)));
         if (hasCamera) {
             builder.keyboardRow(List.of(
-                    button("🔴 Live", "/live " + slug),
-                    button("📷 Камера", "/cam " + slug)));
+                    button(i18n.t("keyboard.live"), "/live " + slug),
+                    button(i18n.t("keyboard.camera"), "/cam " + slug)));
         }
         if (subscriptionsEnabled) {
             builder.keyboardRow(List.of(
-                    button("🔔 Подписаться", "/subscribe " + slug)));
+                    button(i18n.t("keyboard.subscribe"), "/subscribe " + slug)));
         }
         builder.keyboardRow(List.of(
-                button("🏖 Сменить пляж", "CITY_BEACHES:" + cityName),
-                button("🏙 Сменить город", "CITY_SELECT")
+                button(i18n.t("keyboard.change_beach"), "CITY_BEACHES:" + cityName),
+                button(i18n.t("keyboard.change_city"), "CITY_SELECT")
         ));
         return builder.build();
     }
@@ -64,12 +65,12 @@ public final class InlineKeyboards {
                 .build();
     }
 
-    public static InlineKeyboardMarkup cameraRetryButtons(String slug, String cityName) {
+    public static InlineKeyboardMarkup cameraRetryButtons(I18n i18n, String slug, String cityName) {
         return InlineKeyboardMarkup.builder()
-                .keyboardRow(List.of(button("🔄 Проверить снова", "/live " + slug)))
+                .keyboardRow(List.of(button(i18n.t("keyboard.retry_live"), "/live " + slug)))
                 .keyboardRow(List.of(
-                        button("🏖 Сменить пляж", "CITY_BEACHES:" + cityName),
-                        button("🏙 Сменить город", "CITY_SELECT")
+                        button(i18n.t("keyboard.change_beach"), "CITY_BEACHES:" + cityName),
+                        button(i18n.t("keyboard.change_city"), "CITY_SELECT")
                 ))
                 .build();
     }

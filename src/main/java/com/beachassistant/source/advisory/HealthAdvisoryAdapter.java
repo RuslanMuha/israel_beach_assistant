@@ -9,11 +9,13 @@ import com.beachassistant.source.contract.SourceAdapter;
 import com.beachassistant.source.contract.SourceDescriptor;
 import com.beachassistant.source.contract.SourceRequest;
 import com.beachassistant.source.openmeteo.OpenMeteoClient;
+import com.beachassistant.i18n.I18n;
 import com.beachassistant.source.openmeteo.OpenMeteoHourlyTime;
 import com.fasterxml.jackson.databind.JsonNode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
+import java.util.Locale;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -36,13 +38,16 @@ public class HealthAdvisoryAdapter implements SourceAdapter<HealthAdvisoryRecord
     private final BeachProvidersProperties props;
     private final BeachRepository beachRepository;
     private final OpenMeteoClient openMeteoClient;
+    private final I18n i18n;
 
     public HealthAdvisoryAdapter(BeachProvidersProperties props,
                                  BeachRepository beachRepository,
-                                 OpenMeteoClient openMeteoClient) {
+                                 OpenMeteoClient openMeteoClient,
+                                 I18n i18n) {
         this.props = props;
         this.beachRepository = beachRepository;
         this.openMeteoClient = openMeteoClient;
+        this.i18n = i18n;
     }
 
     @Override
@@ -97,9 +102,7 @@ public class HealthAdvisoryAdapter implements SourceAdapter<HealthAdvisoryRecord
             int eaqi = hourly.path("european_aqi").get(idx).asInt();
             boolean active = eaqi >= props.getAirQualityAdvisoryThreshold();
             String message = active
-                    ? ("Индекс качества воздуха CAMS повышен рядом с пляжем (EAQI " + eaqi + "). "
-                    + "Людям из чувствительных групп рекомендуется ограничить длительную физическую нагрузку на улице. "
-                    + "Источник: Open-Meteo Air Quality (CAMS).")
+                    ? i18n.t(Locale.ENGLISH, "health.advisory.eaqi_active", eaqi)
                     : null;
             ZonedDateTime capturedAt = ZonedDateTime.now(ISRAEL);
             String raw = "{\"openMeteoAirQuality\":" + aq + "}";

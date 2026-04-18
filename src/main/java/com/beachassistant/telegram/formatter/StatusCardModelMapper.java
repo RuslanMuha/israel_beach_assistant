@@ -9,6 +9,8 @@ import com.beachassistant.domain.flag.SwimFlagKnowledge;
 import com.beachassistant.domain.model.BeachDecision;
 import com.beachassistant.domain.model.BeachFacilities;
 import com.beachassistant.domain.model.BeachProfile;
+import com.beachassistant.i18n.I18n;
+import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -20,12 +22,18 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * Maps {@link BeachDecision} and profile data into a {@link StatusCardModel} (Russian copy, compact).
+ * Maps {@link BeachDecision} and profile data into a {@link StatusCardModel} (compact card copy).
  */
 @Component
 public class StatusCardModelMapper {
 
     private static final int MAX_FACILITY_LABELS = 5;
+
+    private final I18n i18n;
+
+    public StatusCardModelMapper(I18n i18n) {
+        this.i18n = i18n;
+    }
 
     public StatusCardModel toModel(BeachDecision decision, BeachProfile profile, boolean hasCamera) {
         String beachName = decision.getBeachDisplayName();
@@ -37,8 +45,8 @@ public class StatusCardModelMapper {
                 overallLabel(decision.getRecommendation()),
                 freshnessBadge(decision),
                 shortHumanRecommendation(decision),
-                flagColorRu(decision),
-                lifeguardStatusRu(decision),
+                flagColorLabel(decision),
+                lifeguardStatusLabel(decision),
                 formatWave(decision),
                 formatWater(decision),
                 formatAir(decision),
@@ -77,7 +85,7 @@ public class StatusCardModelMapper {
         if (worst == null) {
             return null;
         }
-        return LegendSection.freshnessDot(worst) + " " + LegendSection.freshnessLabel(worst);
+        return LegendSection.freshnessDot(worst) + " " + i18n.t("freshness.badge." + worst.name());
     }
 
     private static int severity(FreshnessStatus f) {
@@ -88,13 +96,8 @@ public class StatusCardModelMapper {
         };
     }
 
-    private static String overallLabel(Recommendation r) {
-        return switch (r) {
-            case CAN_SWIM -> "Благоприятно";
-            case CAUTION -> "Осторожно";
-            case DO_NOT_RECOMMEND -> "Не рекомендуется";
-            case UNKNOWN -> "Неизвестно";
-        };
+    private String overallLabel(Recommendation r) {
+        return i18n.t("rec." + r.name());
     }
 
     /**
@@ -119,6 +122,9 @@ public class StatusCardModelMapper {
         if (lower.contains("источник") && (lower.contains("качеств") || lower.contains("воздух"))) {
             return false;
         }
+        if (lower.contains("air quality") || lower.contains("eaqi") || lower.contains("sensitive groups")) {
+            return false;
+        }
         return true;
     }
 
@@ -134,39 +140,39 @@ public class StatusCardModelMapper {
         Recommendation rec = d.getRecommendation();
         List<ReasonCode> reasons = d.getReasonCodes();
         if (rec == Recommendation.UNKNOWN) {
-            return "Недостаточно данных для уверенной оценки.";
+            return i18n.t("summary.insufficient_data");
         }
         if (rec == Recommendation.DO_NOT_RECOMMEND) {
             if (reasons.contains(ReasonCode.BEACH_TEMPORARILY_CLOSED)) {
-                return "Пляж временно закрыт.";
+                return i18n.t("summary.beach_closed");
             }
             if (reasons.contains(ReasonCode.SEA_RISK_SEVERE)) {
-                return "Купание сейчас небезопасно.";
+                return i18n.t("summary.unsafe_sea");
             }
             if (reasons.contains(ReasonCode.HEALTH_ADVISORY_ACTIVE)) {
-                return "Купание сейчас не рекомендуется.";
+                return i18n.t("summary.health_advisory");
             }
-            return "Купание сейчас не рекомендуется.";
+            return i18n.t("summary.do_not_recommend");
         }
         if (rec == Recommendation.CAN_SWIM) {
-            return "Условия благоприятные для купания.";
+            return i18n.t("summary.favorable");
         }
         if (reasons.contains(ReasonCode.SEA_RISK_HIGH)) {
-            return "Сильное волнение — купайтесь осторожно.";
+            return i18n.t("summary.rough_sea");
         }
         if (reasons.contains(ReasonCode.JELLYFISH_REPORTS_HIGH)) {
-            return "Сообщается о медузах — будьте осторожны.";
+            return i18n.t("summary.jellyfish");
         }
         if (reasons.contains(ReasonCode.LIFEGUARDS_OFF_DUTY)) {
-            return "Купание без спасателей не рекомендуется.";
+            return i18n.t("summary.no_lifeguards");
         }
-        return "Будьте осторожны при купании.";
+        return i18n.t("summary.default_caution");
     }
 
     /**
      * Municipal flag colour aligned with {@link SwimFlagKnowledge} naming (no legend).
      */
-    String flagColorRu(BeachDecision d) {
+    String flagColorLabel(BeachDecision d) {
         Recommendation rec = d.getRecommendation();
         List<ReasonCode> reasons = d.getReasonCodes();
         if (rec == Recommendation.UNKNOWN) {
@@ -174,25 +180,25 @@ public class StatusCardModelMapper {
         }
         if (rec == Recommendation.DO_NOT_RECOMMEND) {
             if (reasons.contains(ReasonCode.BEACH_TEMPORARILY_CLOSED)) {
-                return SwimFlagKnowledge.BLACK.colorNameRu();
+                return i18n.t("flag.BLACK.name");
             }
-            return SwimFlagKnowledge.RED.colorNameRu();
+            return i18n.t("flag.RED.name");
         }
         if (rec == Recommendation.CAUTION) {
-            return SwimFlagKnowledge.YELLOW.colorNameRu();
+            return i18n.t("flag.YELLOW.name");
         }
-        return SwimFlagKnowledge.GREEN.colorNameRu();
+        return i18n.t("flag.GREEN.name");
     }
 
-    String lifeguardStatusRu(BeachDecision d) {
+    String lifeguardStatusLabel(BeachDecision d) {
         if (!d.isLifeguardScheduleKnown()) {
-            return "по расписанию города";
+            return i18n.t("lifeguard.by_city_schedule");
         }
-        return d.isLifeguardOnDuty() ? "дежурят" : "не дежурят";
+        return d.isLifeguardOnDuty() ? i18n.t("lifeguard.on_duty") : i18n.t("lifeguard.off_duty");
     }
 
-    private static String formatWave(BeachDecision d) {
-        return formatMetric(d.getWaveHeightM(), " м");
+    private String formatWave(BeachDecision d) {
+        return formatMetric(d.getWaveHeightM(), i18n.t("unit.m"));
     }
 
     private static String formatWater(BeachDecision d) {
@@ -210,8 +216,8 @@ public class StatusCardModelMapper {
         return String.format(Locale.US, "%.1f", value).replace(".0", "") + unit;
     }
 
-    private static String formatWindCompact(BeachDecision d) {
-        String speed = formatMetric(d.getWindSpeedMps(), " м/с");
+    private String formatWindCompact(BeachDecision d) {
+        String speed = formatMetric(d.getWindSpeedMps(), i18n.t("unit.mps"));
         if (speed == null) {
             return null;
         }
@@ -219,12 +225,12 @@ public class StatusCardModelMapper {
         if (dir == null || dir.isBlank()) {
             return speed;
         }
-        String abbrev = windAbbrevRu(dir.trim());
+        String abbrev = windDirectionAbbrev(dir.trim());
         return speed + ", " + abbrev;
     }
 
     /**
-     * Short meteorological bearing (e.g. NW → СЗ).
+     * Short meteorological bearing (e.g. NW → СЗ in Russian, NW in English).
      */
     static String windAbbrevRu(String compass8) {
         String c = compass8.toUpperCase(Locale.ROOT);
@@ -241,23 +247,31 @@ public class StatusCardModelMapper {
         };
     }
 
-    private static String formatUvSummary(Double uv) {
+    private String windDirectionAbbrev(String dir) {
+        Locale loc = LocaleContextHolder.getLocale();
+        if (loc != null && "ru".equalsIgnoreCase(loc.getLanguage())) {
+            return windAbbrevRu(dir);
+        }
+        return dir.trim().toUpperCase(Locale.ROOT);
+    }
+
+    private String formatUvSummary(Double uv) {
         if (uv == null) {
             return null;
         }
         if (uv < 3) {
-            return "низкий";
+            return i18n.t("uv.low");
         }
         if (uv < 6) {
-            return "умеренный";
+            return i18n.t("uv.moderate");
         }
         if (uv < 8) {
-            return "высокий";
+            return i18n.t("uv.high");
         }
         if (uv < 11) {
-            return "очень высокий";
+            return i18n.t("uv.very_high");
         }
-        return "экстремальный";
+        return i18n.t("uv.extreme");
     }
 
     private static String formatBeachTypes(BeachProfile profile) {
@@ -275,12 +289,12 @@ public class StatusCardModelMapper {
             return null;
         }
         Map<String, Boolean> m = new LinkedHashMap<>();
-        m.put("душ", f.showers());
-        m.put("туалет", f.toilets());
-        m.put("спорт", f.sportsFacilities());
-        m.put("парковка", f.parking());
-        m.put("площадка", f.playground());
-        m.put("доступность", f.accessible());
+        m.put(i18n.t("facilities.shower"), f.showers());
+        m.put(i18n.t("facilities.toilet"), f.toilets());
+        m.put(i18n.t("facilities.sport"), f.sportsFacilities());
+        m.put(i18n.t("facilities.parking"), f.parking());
+        m.put(i18n.t("facilities.playground"), f.playground());
+        m.put(i18n.t("facilities.accessibility"), f.accessible());
         List<String> labels = m.entrySet().stream()
                 .filter(Map.Entry::getValue)
                 .map(Map.Entry::getKey)
@@ -292,37 +306,37 @@ public class StatusCardModelMapper {
         return String.join(", ", labels);
     }
 
-    private static String formatCameraLine(boolean hasCamera) {
+    private String formatCameraLine(boolean hasCamera) {
         if (!hasCamera) {
             return null;
         }
-        return "доступна";
+        return i18n.t("camera.available");
     }
 
     Optional<String> shortSourceSummary(BeachDecision d) {
         List<String> parts = new ArrayList<>();
         if (d.isLifeguardScheduleKnown()) {
-            parts.add("муниципалитет");
+            parts.add(i18n.t("source.summary.municipality"));
         }
         var cap = d.getSourceCapturedAt();
         if (cap != null && (cap.containsKey(SourceType.SEA_FORECAST) || cap.containsKey(SourceType.HEALTH_ADVISORY))) {
-            parts.add("meteo");
+            parts.add(i18n.t("source.summary.meteo"));
         }
         if (parts.isEmpty()) {
             FreshnessStatus advisoryFreshness = d.getSourceFreshness() != null
                     ? d.getSourceFreshness().get(SourceType.HEALTH_ADVISORY)
                     : null;
             if (advisoryFreshness == FreshnessStatus.EXPIRED) {
-                return Optional.of("Воздух: данные временно недоступны, показываю последнюю успешную запись.");
+                return Optional.of(i18n.t("source.air_stale_note"));
             }
             return Optional.empty();
         }
-        StringBuilder line = new StringBuilder("Данные: " + String.join(" + ", parts));
+        StringBuilder line = new StringBuilder(i18n.t("source.summary.prefix") + " " + String.join(" + ", parts));
         FreshnessStatus advisoryFreshness = d.getSourceFreshness() != null
                 ? d.getSourceFreshness().get(SourceType.HEALTH_ADVISORY)
                 : null;
         if (advisoryFreshness == FreshnessStatus.EXPIRED) {
-            line.append(". Воздух: данные временно недоступны, показываю последнюю успешную запись.");
+            line.append(". ").append(i18n.t("source.air_stale_note"));
         }
         return Optional.of(line.toString());
     }
