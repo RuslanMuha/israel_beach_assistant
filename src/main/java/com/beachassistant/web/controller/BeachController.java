@@ -11,9 +11,17 @@ import com.beachassistant.decision.freshness.FreshnessService;
 import com.beachassistant.domain.model.BeachDecision;
 import com.beachassistant.persistence.entity.*;
 import com.beachassistant.web.dto.*;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.context.request.WebRequest;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 
@@ -59,9 +67,9 @@ public class BeachController {
     }
 
     @GetMapping("/{slug}/status")
-    public BeachStatusDto getStatus(@PathVariable String slug) {
+    public ResponseEntity<BeachStatusDto> getStatus(@PathVariable String slug, WebRequest webRequest) {
         BeachDecision decision = statusUseCase.getStatus(slug);
-        return BeachStatusDto.builder()
+        BeachStatusDto body = BeachStatusDto.builder()
                 .beach(decision.getBeachDisplayName())
                 .city(decision.getCity())
                 .recommendation(decision.getRecommendation())
@@ -79,6 +87,36 @@ public class BeachController {
                 .windDirection(decision.getWindDirection())
                 .windSpeedMps(decision.getWindSpeedMps())
                 .build();
+
+        String etag = computeEtag(decision);
+        long lastModifiedMillis = decision.getGeneratedAt() != null
+                ? decision.getGeneratedAt().toInstant().toEpochMilli()
+                : System.currentTimeMillis();
+        if (webRequest.checkNotModified(etag, lastModifiedMillis)) {
+            return ResponseEntity.status(304).eTag(etag).build();
+        }
+        HttpHeaders headers = new HttpHeaders();
+        headers.setETag(etag);
+        if (decision.getGeneratedAt() != null) {
+            headers.set(HttpHeaders.LAST_MODIFIED,
+                    DateTimeFormatter.RFC_1123_DATE_TIME.format(
+                            decision.getGeneratedAt().withZoneSameInstant(ZoneOffset.UTC)));
+        }
+        headers.setCacheControl("public, max-age=60");
+        return ResponseEntity.ok().headers(headers).body(body);
+    }
+
+    private static String computeEtag(BeachDecision decision) {
+        String raw = decision.getBeachSlug()
+                + "|" + decision.getRecommendation()
+                + "|" + decision.getConfidence()
+                + "|" + (decision.getGeneratedAt() == null ? "" : decision.getGeneratedAt().toInstant().toEpochMilli());
+        try {
+            byte[] d = MessageDigest.getInstance("SHA-256").digest(raw.getBytes(StandardCharsets.UTF_8));
+            return "\"" + HexFormat.of().formatHex(d).substring(0, 16) + "\"";
+        } catch (NoSuchAlgorithmException e) {
+            return "\"" + Integer.toHexString(raw.hashCode()) + "\"";
+        }
     }
 
     @GetMapping("/{slug}/hours")

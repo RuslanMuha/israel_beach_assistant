@@ -1,8 +1,8 @@
 package com.beachassistant.common.exception;
 
-public class CameraUnavailableException extends RuntimeException {
+public class CameraUnavailableException extends BeachAssistantException implements UserFacing {
 
     public CameraUnavailableException(String beachSlug) {
-        super("No active camera for beach: " + beachSlug);
+        super("CAMERA_NOT_FOUND", "No active camera for beach: " + beachSlug);
     }
 }

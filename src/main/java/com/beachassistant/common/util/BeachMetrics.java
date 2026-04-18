@@ -163,4 +163,51 @@ public class BeachMetrics {
                 .register(registry)
                 .increment();
     }
+
+    public void recordTelegramOutbox(String outcome) {
+        Counter.builder("telegram_outbox_total")
+                .tag("outcome", outcome)
+                .register(registry)
+                .increment();
+    }
+
+    public void recordTelegramRateLimit() {
+        Counter.builder("telegram_rate_limit_total")
+                .register(registry)
+                .increment();
+    }
+
+    public void recordTelegramSingleFlightBlock() {
+        Counter.builder("telegram_single_flight_block_total")
+                .register(registry)
+                .increment();
+    }
+
+    public void recordSubscriptionEvent(String event) {
+        Counter.builder("subscription_event_total")
+                .tag("event", event)
+                .register(registry)
+                .increment();
+    }
+
+    public void recordAlertDispatch(String outcome) {
+        Counter.builder("alert_dispatch_total")
+                .tag("outcome", outcome)
+                .register(registry)
+                .increment();
+    }
+
+    public void recordApiRateLimit(String outcome) {
+        Counter.builder("api_rate_limit_total")
+                .tag("outcome", outcome)
+                .register(registry)
+                .increment();
+    }
+
+    public void recordClosureSnapshot(String source) {
+        Counter.builder("closure_snapshot_total")
+                .tag("source", source)
+                .register(registry)
+                .increment();
+    }
 }

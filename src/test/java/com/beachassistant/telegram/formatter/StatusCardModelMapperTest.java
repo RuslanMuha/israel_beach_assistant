@@ -82,6 +82,21 @@ class StatusCardModelMapperTest {
     }
 
     @Test
+    void freshnessBadge_returnsWorstCaseDotAcrossPrimarySources() {
+        Map<SourceType, FreshnessStatus> f = new EnumMap<>(SourceType.class);
+        f.put(SourceType.SEA_FORECAST, FreshnessStatus.FRESH);
+        f.put(SourceType.HEALTH_ADVISORY, FreshnessStatus.STALE);
+        BeachDecision d = decisionBase().sourceFreshness(f).build();
+        assertThat(mapper.freshnessBadge(d)).contains("🟡").contains("частично");
+    }
+
+    @Test
+    void freshnessBadge_nullWhenNoFreshnessData() {
+        BeachDecision d = decisionBase().sourceFreshness(Map.of()).build();
+        assertThat(mapper.freshnessBadge(d)).isNull();
+    }
+
+    @Test
     void facilities_cappedAndShortLabels() {
         BeachFacilities f = new BeachFacilities(true, true, true, true, true, true);
         BeachProfile p = new BeachProfile(null, List.of("family"), f, null, null, null, null, null, null);

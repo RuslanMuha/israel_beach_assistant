@@ -56,12 +56,12 @@ public class ResponseFormatter {
      */
     public String formatStatusDetails(BeachDecision decision, BeachProfile profile) {
         StringBuilder sb = new StringBuilder();
-        sb.append("📋 Подробнее — ").append(decision.getBeachDisplayName())
+        sb.append(LegendSection.DETAILS_EMOJI).append(" Подробнее — ").append(decision.getBeachDisplayName())
                 .append(" (").append(decision.getCity()).append(")\n\n");
 
-        sb.append("🌤 Дополнительно\n");
+        sb.append(LegendSection.WEATHER_EMOJI).append(" Дополнительно\n");
         if (decision.getRelativeHumidityPct() != null) {
-            sb.append("💧 Влажность: ").append(formatNumber(decision.getRelativeHumidityPct(), "%")).append("\n");
+            sb.append(LegendSection.HUMIDITY_EMOJI).append(" Влажность: ").append(formatNumber(decision.getRelativeHumidityPct(), "%")).append("\n");
         }
         sb.append("Комфорт: ").append(weatherComfortEvaluator.comfortLabel(decision)).append("\n");
 
@@ -74,7 +74,7 @@ public class ResponseFormatter {
         }
 
         if (decision.getEffectiveFrom() != null && decision.getEffectiveTo() != null) {
-            sb.append("\n⏱ Окно прогноза (волна и вода)\n");
+            sb.append("\n").append(LegendSection.CLOCK_EMOJI).append(" Окно прогноза (волна и вода)\n");
             sb.append("с ").append(TimeUtil.formatForDisplay(decision.getEffectiveFrom())).append("\n");
             sb.append("по ").append(TimeUtil.formatForDisplay(decision.getEffectiveTo())).append("\n");
             if (decision.isIntervalIsInferred()) {
@@ -82,14 +82,14 @@ public class ResponseFormatter {
             }
         }
 
-        sb.append("\n📡 Источники\n");
+        sb.append("\n").append(LegendSection.SOURCE_EMOJI).append(" Источники\n");
         for (String sourceLine : sourceLines(decision)) {
             sb.append("• ").append(sourceLine).append("\n");
         }
 
         appendBeachProfileDetails(sb, profile);
 
-        sb.append("\n📋 Справка по флагам\n");
+        sb.append("\n").append(LegendSection.DETAILS_EMOJI).append(" Справка по флагам\n");
         sb.append(SwimFlagKnowledge.compactLegendRu()).append("\n");
 
         sb.append("\nУверенность: ").append(confidenceRu(decision)).append("\n");
@@ -103,7 +103,7 @@ public class ResponseFormatter {
         if (profile == null || profile.isEmpty()) {
             return;
         }
-        sb.append("\nℹ️ О пляже\n");
+        sb.append("\n").append(LegendSection.INFO_EMOJI).append(" О пляже\n");
         if (profile.description() != null && !profile.description().isBlank()) {
             sb.append(profile.description()).append("\n");
         }
@@ -129,7 +129,7 @@ public class ResponseFormatter {
 
     public String formatHours(LifeguardHoursDto dto) {
         StringBuilder sb = new StringBuilder();
-        sb.append("🏊 Спасатели — ").append(dto.getBeach()).append("\n\n");
+        sb.append(LegendSection.LIFEGUARD_EMOJI).append(" Спасатели — ").append(dto.getBeach()).append("\n\n");
 
         if (dto.isOnDuty()) {
             sb.append("✅ Дежурят до ").append(dto.getCloseTime()).append("\n");
@@ -146,7 +146,7 @@ public class ResponseFormatter {
 
     public String formatJellyfish(JellyfishDto dto) {
         StringBuilder sb = new StringBuilder();
-        sb.append("🪼 Медузы — ").append(dto.getBeach()).append("\n\n");
+        sb.append(LegendSection.JELLYFISH_EMOJI).append(" Медузы — ").append(dto.getBeach()).append("\n\n");
 
         sb.append("Уровень: ").append(jellyfishSeverityRu(dto)).append("\n");
 
@@ -168,31 +168,31 @@ public class ResponseFormatter {
 
     public String formatCameraLive(String beachName, String liveUrl, String healthStatus) {
         if ("UNREACHABLE".equalsIgnoreCase(healthStatus)) {
-            return "📷 Камера — " + beachName + "\n\n⚠ Камера временно недоступна (источник не отвечает).";
+            return LegendSection.CAMERA_EMOJI + " Камера — " + beachName + "\n\n⚠ Камера временно недоступна (источник не отвечает).";
         }
-        return "📷 Камера — " + beachName + "\n\n🔴 Прямая трансляция:\n" + liveUrl;
+        return LegendSection.CAMERA_EMOJI + " Камера — " + beachName + "\n\n🔴 Прямая трансляция:\n" + liveUrl;
     }
 
     public String formatCameraUnavailable(String beachName) {
-        return "📷 " + beachName + "\n\nКамера не настроена для этого пляжа.";
+        return LegendSection.CAMERA_EMOJI + " " + beachName + "\n\nКамера не настроена для этого пляжа.";
     }
 
     public String formatCameraTemporarilyUnavailable(String beachName) {
-        return "📷 Камера — " + beachName
+        return LegendSection.CAMERA_EMOJI + " Камера — " + beachName
                 + "\n\n⚠ Сейчас трансляция недоступна на стороне провайдера."
                 + "\nПопробуйте позже или выберите другой пляж.";
     }
 
     public String formatBeachList(java.util.List<com.beachassistant.persistence.entity.BeachEntity> beaches) {
         String city = beaches.isEmpty() ? "" : beaches.get(0).getCity().getName();
-        StringBuilder sb = new StringBuilder("🏖 Поддерживаемые пляжи (").append(city).append("):\n\n");
+        StringBuilder sb = new StringBuilder(LegendSection.BEACH_EMOJI).append(" Поддерживаемые пляжи (").append(city).append("):\n\n");
         for (var beach : beaches) {
             sb.append("• ").append(beach.getDisplayName());
             if (beach.isHasLifeguards()) {
-                sb.append(" 🏊");
+                sb.append(" ").append(LegendSection.LIFEGUARD_EMOJI);
             }
             if (beach.isHasCamera()) {
-                sb.append(" 📷");
+                sb.append(" ").append(LegendSection.CAMERA_EMOJI);
             }
             sb.append("\n");
         }
@@ -201,7 +201,7 @@ public class ResponseFormatter {
     }
 
     public String formatWelcome(java.util.List<com.beachassistant.persistence.entity.BeachEntity> beaches) {
-        return "👋 Привет! Я Beach Assistant — помогу узнать, можно ли идти на пляж прямо сейчас.\n\n"
+        return LegendSection.WAVE_HI + " Привет! Я Beach Assistant — помогу узнать, можно ли идти на пляж прямо сейчас.\n\n"
                 + "Поддерживаемые пляжи: " + beaches.stream()
                 .map(com.beachassistant.persistence.entity.BeachEntity::getDisplayName)
                 .collect(java.util.stream.Collectors.joining(", "))
@@ -257,10 +257,10 @@ public class ResponseFormatter {
 
     private List<String> sourceLines(BeachDecision decision) {
         List<String> lines = new ArrayList<>();
-        lines.add(sourceLine(decision, SourceType.SEA_FORECAST, "🌊 Море и ветер — Open-Meteo Marine/Forecast"));
-        lines.add(sourceLine(decision, SourceType.HEALTH_ADVISORY, "🏥 Воздух — Open-Meteo Air Quality (CAMS)"));
-        lines.add(sourceLine(decision, SourceType.LIFEGUARD_SCHEDULE, "🏊 Спасатели — расписание в базе"));
-        lines.add(sourceLine(decision, SourceType.JELLYFISH, "🪼 Медузы — iNaturalist"));
+        lines.add(sourceLine(decision, SourceType.SEA_FORECAST, LegendSection.SEA_EMOJI + " Море и ветер — Open-Meteo Marine/Forecast"));
+        lines.add(sourceLine(decision, SourceType.HEALTH_ADVISORY, LegendSection.AIR_EMOJI + " Воздух — Open-Meteo Air Quality (CAMS)"));
+        lines.add(sourceLine(decision, SourceType.LIFEGUARD_SCHEDULE, LegendSection.LIFEGUARD_EMOJI + " Спасатели — расписание в базе"));
+        lines.add(sourceLine(decision, SourceType.JELLYFISH, LegendSection.JELLYFISH_EMOJI + " Медузы — iNaturalist"));
         return lines;
     }
 

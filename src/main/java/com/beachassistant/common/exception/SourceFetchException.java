@@ -2,17 +2,17 @@ package com.beachassistant.common.exception;
 
 import com.beachassistant.common.enums.SourceType;
 
-public class SourceFetchException extends RuntimeException {
+public class SourceFetchException extends BeachAssistantException implements Transient {
 
     private final SourceType sourceType;
 
     public SourceFetchException(SourceType sourceType, String message, Throwable cause) {
-        super("Source fetch failed [" + sourceType + "]: " + message, cause);
+        super("SOURCE_FETCH_FAILED", "Source fetch failed [" + sourceType + "]: " + message, cause);
         this.sourceType = sourceType;
     }
 
     public SourceFetchException(SourceType sourceType, String message) {
-        super("Source fetch failed [" + sourceType + "]: " + message);
+        super("SOURCE_FETCH_FAILED", "Source fetch failed [" + sourceType + "]: " + message);
         this.sourceType = sourceType;
     }
 

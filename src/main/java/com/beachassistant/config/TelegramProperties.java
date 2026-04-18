@@ -39,7 +39,19 @@ public class TelegramProperties {
     private String token = "CONFIGURE_ME";
     private String username = "beach_assistant_bot";
 
+    /**
+     * Opt-in UI features that depend on downstream subsystems still under rollout.
+     */
+    private Features features = new Features();
+
     public boolean isPlaceholderToken() {
         return token == null || token.isBlank() || "CONFIGURE_ME".equalsIgnoreCase(token.trim());
+    }
+
+    @Getter
+    @Setter
+    public static class Features {
+        /** Shows the "Подписаться" inline button and enables subscription commands. */
+        private boolean subscriptionsEnabled = false;
     }
 }

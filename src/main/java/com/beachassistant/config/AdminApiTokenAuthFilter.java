@@ -13,6 +13,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.util.List;
 
 /**
@@ -48,7 +50,7 @@ public class AdminApiTokenAuthFilter extends OncePerRequestFilter {
             return;
         }
         String presented = request.getHeader(ADMIN_TOKEN_HEADER);
-        if (presented != null && presented.equals(adminApiProperties.getApiToken())) {
+        if (presented != null && constantTimeEquals(presented, adminApiProperties.getApiToken())) {
             UsernamePasswordAuthenticationToken auth = new UsernamePasswordAuthenticationToken(
                     "admin",
                     null,
@@ -63,5 +65,18 @@ public class AdminApiTokenAuthFilter extends OncePerRequestFilter {
         response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer realm=\"admin\"");
         response.setContentType("application/json");
         response.getWriter().write("{\"error\":\"UNAUTHORIZED\",\"message\":\"Missing or invalid X-Admin-Token\"}");
+    }
+
+    /**
+     * Timing-safe equality: avoids leaking token length or matching-prefix information through
+     * {@link String#equals} early-exit behaviour.
+     */
+    private static boolean constantTimeEquals(String a, String b) {
+        if (a == null || b == null) {
+            return false;
+        }
+        byte[] ba = a.getBytes(StandardCharsets.UTF_8);
+        byte[] bb = b.getBytes(StandardCharsets.UTF_8);
+        return MessageDigest.isEqual(ba, bb);
     }
 }

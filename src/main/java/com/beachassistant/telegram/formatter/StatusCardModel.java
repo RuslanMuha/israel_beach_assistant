@@ -11,6 +11,7 @@ public record StatusCardModel(
         String city,
         String overallEmoji,
         String overallLabel,
+        String freshnessBadge,
         String shortHumanRecommendation,
         String flagLabel,
         String lifeguardLine,

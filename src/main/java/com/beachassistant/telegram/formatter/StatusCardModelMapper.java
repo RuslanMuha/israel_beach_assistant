@@ -33,8 +33,9 @@ public class StatusCardModelMapper {
         return new StatusCardModel(
                 beachName,
                 city,
-                overallEmoji(decision.getRecommendation()),
+                LegendSection.recommendation(decision.getRecommendation()),
                 overallLabel(decision.getRecommendation()),
+                freshnessBadge(decision),
                 shortHumanRecommendation(decision),
                 flagColorRu(decision),
                 lifeguardStatusRu(decision),
@@ -51,12 +52,39 @@ public class StatusCardModelMapper {
         );
     }
 
-    private static String overallEmoji(Recommendation r) {
-        return switch (r) {
-            case CAN_SWIM -> "✅";
-            case CAUTION -> "⚠️";
-            case DO_NOT_RECOMMEND -> "🚫";
-            case UNKNOWN -> "❓";
+    /**
+     * Worst-case freshness badge across the primary signal sources (sea + air).
+     * Returns {@code null} when all relevant freshness data is missing (card header stays clean).
+     */
+    String freshnessBadge(BeachDecision d) {
+        Map<SourceType, FreshnessStatus> freshness = d.getSourceFreshness();
+        if (freshness == null || freshness.isEmpty()) {
+            return null;
+        }
+        FreshnessStatus worst = null;
+        for (SourceType type : List.of(SourceType.SEA_FORECAST, SourceType.HEALTH_ADVISORY)) {
+            if (d.getMissingSourceTypes() != null && d.getMissingSourceTypes().contains(type)) {
+                continue;
+            }
+            FreshnessStatus f = freshness.get(type);
+            if (f == null) {
+                continue;
+            }
+            if (worst == null || severity(f) > severity(worst)) {
+                worst = f;
+            }
+        }
+        if (worst == null) {
+            return null;
+        }
+        return LegendSection.freshnessDot(worst) + " " + LegendSection.freshnessLabel(worst);
+    }
+
+    private static int severity(FreshnessStatus f) {
+        return switch (f) {
+            case FRESH -> 0;
+            case STALE -> 1;
+            case EXPIRED -> 2;
         };
     }
 

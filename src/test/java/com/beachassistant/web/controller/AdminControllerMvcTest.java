@@ -4,7 +4,11 @@ import com.beachassistant.app.usecase.IngestionUseCase;
 import com.beachassistant.common.enums.SourceType;
 import com.beachassistant.config.SecurityConfig;
 import com.beachassistant.persistence.entity.IngestionRunEntity;
+import com.beachassistant.persistence.repository.BeachRepository;
+import com.beachassistant.persistence.repository.ClosureSnapshotRepository;
 import com.beachassistant.persistence.repository.IngestionRunRepository;
+
+import java.time.Clock;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -36,6 +40,15 @@ class AdminControllerMvcTest {
 
     @MockBean
     private IngestionRunRepository ingestionRunRepository;
+
+    @MockBean
+    private ClosureSnapshotRepository closureSnapshotRepository;
+
+    @MockBean
+    private BeachRepository beachRepository;
+
+    @MockBean
+    private Clock clock;
 
     @Test
     void postIngest_withoutToken_returns401() throws Exception {

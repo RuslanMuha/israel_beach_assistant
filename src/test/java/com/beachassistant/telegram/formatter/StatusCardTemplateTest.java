@@ -15,6 +15,7 @@ class StatusCardTemplateTest {
                 "Ashdod",
                 "⚠️",
                 "Осторожно",
+                "🟢 свежо",
                 "Купание без спасателей не рекомендуется",
                 "жёлтый",
                 "не дежурят",
@@ -32,7 +33,7 @@ class StatusCardTemplateTest {
         String text = StatusCardTemplate.format(model);
         assertThat(text).isEqualTo("""
                 Lido (Ashdod)
-                ⚠️ Осторожно
+                ⚠️ Осторожно  🟢 свежо
                 Купание без спасателей не рекомендуется
 
                 Сейчас:
@@ -62,6 +63,7 @@ class StatusCardTemplateTest {
                 "Y",
                 "❓",
                 "Неизвестно",
+                null,
                 "Недостаточно данных для уверенной оценки.",
                 null,
                 null,

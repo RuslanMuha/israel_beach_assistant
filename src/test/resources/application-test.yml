@@ -20,6 +20,10 @@ beach:
     mode: polling
     token: TEST_TOKEN
     username: test_bot
+    outbox:
+      enabled: false
+    rate-limit:
+      enabled: false
   providers:
     stub: true
   freshness:
